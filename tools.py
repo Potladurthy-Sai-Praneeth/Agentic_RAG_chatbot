@@ -28,8 +28,7 @@ def get_chat_model():
         return ChatGoogleGenerativeAI(
             model=CHAT_MODEL_NAME,
             google_api_key=os.getenv("GEMINI_API_KEY"),
-            temperature=0.7,
-            convert_system_message_to_human=True
+            temperature=0.7
         )
     elif CHAT_MODEL_PROVIDER == 'openai':
         return ChatOpenAI(
@@ -56,9 +55,9 @@ def get_vectorstore():
 
 @tool
 def retrieve_personal_info(query: str) -> str:
-    f"""
-    Searches a personal vector database containing documents about {NAME}. 
-    Use this to find info on {NAME}'s resume, skills, project reports, and other professional or personal explanations.
+    """
+    Searches a personal vector database containing documents about Praneeth. 
+    Use this to find info on Praneeth's resume, skills, project reports, and other professional or personal explanations.
     
     Args:
         query: The specific information to search for (e.g., 'What was my role at Company X?').

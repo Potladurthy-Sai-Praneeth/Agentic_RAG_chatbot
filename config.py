@@ -6,6 +6,23 @@ PINECONE_INDEX_NAME = "personal-chatbot"
 PINECONE_TOP_K = 5
 
 
+# Cassandra Configuration
+CASSANDRA_HOSTS = ['127.0.0.1']  # Update with your Cassandra hosts
+CASSANDRA_PORT = 9042
+CASSANDRA_KEYSPACE = 'chatbot_sessions'
+CASSANDRA_REPLICATION_FACTOR = 1  # Adjust based on your cluster setup
+
+# Redis Configuration
+REDIS_HOST = 'localhost'
+REDIS_PORT = 6379
+REDIS_DB = 0
+REDIS_DECODE_RESPONSES = True
+
+# Cache and Summarization Configuration
+CACHE_MESSAGE_LIMIT = 10  # k messages to keep in cache before summarization
+SUMMARY_MODEL_PROVIDER = 'gemini'  # 'gemini' or 'openai'
+SUMMARY_MODEL_NAME = 'gemini-flash-latest'  # Smaller/faster model for summarization
+
 
 CHAT_MODEL_PROVIDER = 'gemini'
 CHAT_MODEL_NAME = 'gemini-2.5-pro'  
@@ -47,6 +64,17 @@ When you do use the tool, it will return a JSON object with 'context' and 'sourc
 - If you use context to answer, you can subtly mention where the info came from,
   e.g., "According to the project report..." or cite the sources if available.
 """
+
+# Summarization prompt template
+SUMMARIZATION_PROMPT = """You are a conversation summarizer. Given the conversation history and the current running summary below, create a concise summary that captures the key topics, questions asked, and information discussed.
+
+Current Summary:
+{current_summary}
+
+Conversation History:
+{conversation}
+
+Provide a combined summary that captures the essence of both the eixsting summary and the conversation history:"""
 
 # RAG prompt template for generating answers from retrieved context
 RAG_PROMPT_TEMPLATE = """Based on the following context, answer the question.

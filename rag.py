@@ -101,18 +101,17 @@ class RAGChatbot:
         if should_summarize:
             self._trigger_summarization()
     
-    def _trigger_summarization(self) -> None:
-        """Trigger asynchronous summarization of cached messages."""
+    def _trigger_summarization(self):
+        """Trigger async summarization when cache limit is reached."""
         session_id = self.session_manager.get_current_session_id()
         user_id = self.session_manager.get_current_user_id()
-        
-        # Get messages from cache for summarization
-        messages = self.cache_manager.get_messages(session_id)
+
+        messages = self.cache_manager.get_messages(session_id, limit=CACHE_MESSAGE_LIMIT)
         
         # Get previous summary (if exists)
         previous_summary = self.cache_manager.get_summary(session_id) or ""
         
-        print(f"[RAGChatbot] Triggering async summarization for {len(messages)} messages")
+        print(f"[RAGChatbot] Triggering async summarization for {len(messages)} NEW messages")
         
         # Create and run the async task in the background
         loop = asyncio.get_event_loop()

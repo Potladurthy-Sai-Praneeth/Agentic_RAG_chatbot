@@ -1,0 +1,12 @@
+# PostgreSQL Configuration
+postgres:
+  host: "localhost"
+  port: 5432
+  min_connections: 1
+  max_connections: 20
+  hex_token_length: 32
+
+jwt:
+  access_token_expires: 30
+  refresh_token_expires: 7
+  algorithm: "HS256"

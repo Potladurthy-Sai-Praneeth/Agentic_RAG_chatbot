@@ -1,0 +1,10 @@
+python-jose[cryptography] 
+passlib[bcrypt] 
+python-multipart
+asyncpg
+fastapi
+pydantic
+pydantic-settings
+pydantic-core
+pydantic-settings
+uvicorn

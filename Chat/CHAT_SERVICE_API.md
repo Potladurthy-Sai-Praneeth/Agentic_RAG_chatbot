@@ -1,0 +1,388 @@
+# Chat Service API Documentation
+
+## Overview
+
+The Chat Service API is a FastAPI-based microservice for managing chat messages, sessions, and session summaries. It uses Cassandra for data persistence and requires JWT authentication for most endpoints.
+
+**Base URL**: `http://localhost:8002`  
+**Version**: 1.0.0
+
+---
+
+## Authentication
+
+Most endpoints require JWT Bearer token authentication. Include the token in the Authorization header:
+
+```
+Authorization: Bearer <access_token>
+```
+
+The token should be obtained from the User Service `/login` endpoint. The token payload must contain:
+- `sub`: User ID
+- `type`: "access"
+
+---
+
+## Endpoints
+
+### 1. Store Chat Message
+
+**Endpoint**: `POST /chat/{session_id}/add-message`
+
+**Description**: Store a new chat message in the database for a specific session.
+
+**Authentication**: Required (Bearer Token)
+
+**Path Parameters**:
+- `session_id` (string, required): The unique identifier for the chat session
+
+**Request Body**:
+```json
+{
+  "role": "string",
+  "content": "string"
+}
+```
+
+**Request Model**: `StoreChatMessageRequestModel`
+- `role` (string, required): The role of the message sender (e.g., "user", "assistant", "system")
+- `content` (string, required): The message content
+
+**Response**: `201 Created`
+
+**Response Model**: `StoreChatMessageResponseModel`
+```json
+{
+  "message_id": "string",
+  "timestamp": "datetime",
+  "success": true,
+  "message": "string (optional)"
+}
+```
+
+**Response Fields**:
+- `message_id` (string): Unique identifier for the stored message
+- `timestamp` (datetime): Timestamp when the message was stored
+- `success` (boolean): Indicates if the operation was successful
+- `message` (string, optional): Success message
+
+**Error Responses**:
+- `401 Unauthorized`: Invalid or missing authentication token
+- `503 Service Unavailable`: Chat service not initialized
+- `500 Internal Server Error`: Failed to store chat message
+
+---
+
+### 2. Get Chat Messages
+
+**Endpoint**: `GET /chat/{session_id}/get-messages`
+
+**Description**: Retrieve all chat messages for a specific session.
+
+**Authentication**: Required (Bearer Token)
+
+**Path Parameters**:
+- `session_id` (string, required): The unique identifier for the chat session
+
+**Response**: `200 OK`
+
+**Response Model**: `List[GetAllChatMessageResponseModel]`
+```json
+[
+  {
+    "message_id": "string",
+    "role": "string",
+    "content": "string",
+    "timestamp": "datetime"
+  }
+]
+```
+
+**Response Fields** (per message):
+- `message_id` (string): Unique identifier for the message
+- `role` (string): The role of the message sender
+- `content` (string): The message content
+- `timestamp` (datetime): Timestamp when the message was created
+
+**Error Responses**:
+- `401 Unauthorized`: Invalid or missing authentication token
+- `503 Service Unavailable`: Chat service not initialized
+- `500 Internal Server Error`: Failed to retrieve chat messages
+
+---
+
+### 3. Get Session Summary
+
+**Endpoint**: `GET /chat/{session_id}/get-summary`
+
+**Description**: Retrieve the summary for a specific session.
+
+**Authentication**: Required (Bearer Token)
+
+**Path Parameters**:
+- `session_id` (string, required): The unique identifier for the chat session
+
+**Response**: `200 OK`
+
+**Response Model**: `GetSessionSummaryResponseModel`
+```json
+{
+  "session_id": "string",
+  "user_id": "string",
+  "summary": "string",
+  "last_updated": "datetime",
+  "message_count": 0
+}
+```
+
+**Response Fields**:
+- `session_id` (string): The session identifier
+- `user_id` (string): The user ID associated with the session
+- `summary` (string): The session summary text
+- `last_updated` (datetime): Timestamp when the summary was last updated
+- `message_count` (integer): Number of messages in the session
+
+**Error Responses**:
+- `401 Unauthorized`: Invalid or missing authentication token
+- `404 Not Found`: Session summary not found
+- `503 Service Unavailable`: Chat service not initialized
+- `500 Internal Server Error`: Failed to retrieve session summary
+
+---
+
+### 4. Insert Session Summary
+
+**Endpoint**: `POST /chat/{session_id}/insert-summary`
+
+**Description**: Insert or update the summary for a specific session.
+
+**Authentication**: Required (Bearer Token)
+
+**Path Parameters**:
+- `session_id` (string, required): The unique identifier for the chat session
+
+**Request Body**:
+```json
+{
+  "summary": "string",
+  "message_count": 0
+}
+```
+
+**Request Model**: `InsertSessionSummaryRequestModel`
+- `summary` (string, required): The summary text to store
+- `message_count` (integer, required): The number of messages in the session
+
+**Response**: `200 OK`
+
+**Response Model**: `InsertSessionSummaryResponseModel`
+```json
+{
+  "success": true,
+  "message": "string (optional)"
+}
+```
+
+**Response Fields**:
+- `success` (boolean): Indicates if the operation was successful
+- `message` (string, optional): Success message
+
+**Error Responses**:
+- `401 Unauthorized`: Invalid or missing authentication token
+- `503 Service Unavailable`: Chat service not initialized
+- `500 Internal Server Error`: Failed to insert session summary
+
+---
+
+### 5. Get Message Count
+
+**Endpoint**: `GET /chat/{session_id}/get-message-count`
+
+**Description**: Retrieve the total number of messages for a specific session.
+
+**Authentication**: Required (Bearer Token)
+
+**Path Parameters**:
+- `session_id` (string, required): The unique identifier for the chat session
+
+**Response**: `200 OK`
+
+**Response Model**: `GetMessageCountResponseModel`
+```json
+{
+  "session_id": "string",
+  "message_count": 0
+}
+```
+
+**Response Fields**:
+- `session_id` (string): The session identifier
+- `message_count` (integer): Total number of messages in the session
+
+**Error Responses**:
+- `401 Unauthorized`: Invalid or missing authentication token
+- `503 Service Unavailable`: Chat service not initialized
+- `500 Internal Server Error`: Failed to retrieve message count
+
+---
+
+### 6. Delete Chat Messages
+
+**Endpoint**: `DELETE /chat/{session_id}/delete`
+
+**Description**: Delete all chat messages for a specific session.
+
+**Authentication**: Required (Bearer Token)
+
+**Path Parameters**:
+- `session_id` (string, required): The unique identifier for the chat session
+
+**Response**: `200 OK`
+
+**Response Model**: `DeleteChatMessagesResponseModel`
+```json
+{
+  "success": true,
+  "message": "string (optional)"
+}
+```
+
+**Response Fields**:
+- `success` (boolean): Indicates if the operation was successful
+- `message` (string, optional): Success message
+
+**Error Responses**:
+- `401 Unauthorized`: Invalid or missing authentication token
+- `503 Service Unavailable`: Chat service not initialized
+- `500 Internal Server Error`: Failed to delete chat messages
+
+---
+
+### 7. Health Check
+
+**Endpoint**: `GET /health`
+
+**Description**: Check the health status of the Chat Service.
+
+**Authentication**: Not required
+
+**Response**: `200 OK`
+
+**Response Model**: `HealthCheckResponseModel`
+```json
+{
+  "status": "healthy",
+  "message": "string"
+}
+```
+
+**Response Fields**:
+- `status` (string): Health status (e.g., "healthy")
+- `message` (string): Health check message
+
+**Error Responses**:
+- `503 Service Unavailable`: Chat service or database is not available/unhealthy
+- `500 Internal Server Error`: Internal server error during health check
+
+---
+
+### 8. Root Endpoint
+
+**Endpoint**: `GET /`
+
+**Description**: Welcome endpoint that provides service information and available endpoints.
+
+**Authentication**: Not required
+
+**Response**: `200 OK`
+
+**Response**:
+```json
+{
+  "service": "Chat Service API",
+  "status": "running",
+  "message": "Welcome to the Chat Service API!",
+  "endpoints": {
+    "POST /chat/{session_id}/add-message": "Store a chat message",
+    "GET /chat/{session_id}/get-messages": "Retrieve chat messages for a session",
+    "GET /chat/{session_id}/get-summary": "Retrieve session summary",
+    "POST /chat/{session_id}/insert-summary": "Insert session summary",
+    "GET /chat/{session_id}/get-message-count": "Retrieve message count for a session",
+    "DELETE /chat/{session_id}/delete": "Delete all chat messages for a session",
+    "GET /health": "Health Check Endpoint"
+  }
+}
+```
+
+---
+
+## Data Types
+
+### Common Types
+
+- **string**: Text data
+- **datetime**: ISO 8601 formatted datetime string (e.g., "2024-01-15T10:30:00")
+- **boolean**: true or false
+- **integer**: Numeric integer value
+
+### Role Values
+
+The `role` field in chat messages typically accepts:
+- `"user"`: Messages from the user
+- `"assistant"`: Messages from the AI assistant
+- `"system"`: System messages
+
+---
+
+## Integration Notes
+
+### For Other Services
+
+1. **Authentication**: Obtain a JWT access token from the User Service `/login` endpoint before calling Chat Service endpoints.
+
+2. **Session Management**: Sessions should be created in the User Service before storing messages in the Chat Service.
+
+3. **User ID Extraction**: The Chat Service extracts `user_id` from the JWT token payload (`sub` field). Ensure tokens are properly formatted.
+
+4. **Error Handling**: Always check for:
+   - `401 Unauthorized`: Re-authenticate and retry
+   - `503 Service Unavailable`: Service may be starting up or database connection lost
+   - `500 Internal Server Error`: Log error and retry with exponential backoff
+
+5. **CORS**: The service allows CORS from all origins. Configure appropriately for production.
+
+---
+
+## Example Usage
+
+### Store a Message
+
+```bash
+curl -X POST "http://localhost:8002/chat/session-123/add-message" \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "role": "user",
+    "content": "Hello, how are you?"
+  }'
+```
+
+### Get Messages
+
+```bash
+curl -X GET "http://localhost:8002/chat/session-123/get-messages" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+### Insert Summary
+
+```bash
+curl -X POST "http://localhost:8002/chat/session-123/insert-summary" \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "summary": "User asked about weather and received information about sunny conditions.",
+    "message_count": 4
+  }'
+```
+

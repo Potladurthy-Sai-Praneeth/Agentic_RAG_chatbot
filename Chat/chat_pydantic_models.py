@@ -9,8 +9,10 @@ class StoreChatMessageResponseModel(BaseModel):
     message: Optional[str] = None
 
 class StoreChatMessageRequestModel(BaseModel):
+    message_id: str
     role: str
     content: str
+    timestamp: Optional[datetime] = None
 
 class GetAllChatMessageRequestModel(BaseModel):
     session_id: str
@@ -34,6 +36,7 @@ class GetSessionSummaryRequestModel(BaseModel):
 class InsertSessionSummaryRequestModel(BaseModel):
     summary: str
     message_count: int
+    timestamp: Optional[datetime] = None
 
 class InsertSessionSummaryResponseModel(BaseModel):
     success: bool

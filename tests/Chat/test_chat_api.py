@@ -52,13 +52,15 @@ class TestChatAPIStoreMessage:
         """Test successful message storage."""
         session_id = "test_session_12345"
         message_data = {
+            "message_id": "550e8400-e29b-41d4-a716-446655440000",
             "role": "user",
             "content": "Hello, this is a test message"
         }
         
+        test_timestamp = datetime.now()
         mock_chat_service.store_message = AsyncMock(return_value={
-            "message_id": "msg_12345",
-            "timestamp": datetime.now()
+            "message_id": "550e8400-e29b-41d4-a716-446655440000",
+            "timestamp": test_timestamp
         })
         
         # Mock authentication
@@ -72,13 +74,48 @@ class TestChatAPIStoreMessage:
         assert response.status_code == 201
         assert response.json()["success"] is True
         assert "message_id" in response.json()
+        assert response.json()["message_id"] == "550e8400-e29b-41d4-a716-446655440000"
+    
+    def test_store_message_with_timestamp(self, client, mock_chat_service):
+        """Test successful message storage with provided timestamp."""
+        session_id = "test_session_12345"
+        test_timestamp = datetime.now()
+        message_data = {
+            "message_id": "550e8400-e29b-41d4-a716-446655440000",
+            "role": "user",
+            "content": "Hello, this is a test message",
+            "timestamp": test_timestamp.isoformat()
+        }
+        
+        mock_chat_service.store_message = AsyncMock(return_value={
+            "message_id": "550e8400-e29b-41d4-a716-446655440000",
+            "timestamp": test_timestamp
+        })
+        
+        # Mock authentication
+        with patch('Chat.chat_api.get_current_user', return_value={"user_id": "test_user_12345"}):
+            response = client.post(
+                f"/chat/{session_id}/add-message",
+                json=message_data,
+                headers={"Authorization": "Bearer test_token"}
+            )
+        
+        assert response.status_code == 201
+        assert response.json()["success"] is True
+        assert "message_id" in response.json()
+        assert response.json()["message_id"] == "550e8400-e29b-41d4-a716-446655440000"
+        # Verify timestamp was passed to service
+        mock_chat_service.store_message.assert_called_once()
+        call_args = mock_chat_service.store_message.call_args
+        assert call_args.kwargs.get('timestamp') is not None
+        assert call_args.kwargs.get('message_id') == "550e8400-e29b-41d4-a716-446655440000"
     
     def test_store_message_service_not_initialized(self, client):
         """Test store message when service is not initialized."""
         with patch('Chat.chat_api.chat_db', None):
             response = client.post(
                 "/chat/test_session/add-message",
-                json={"role": "user", "content": "test"},
+                json={"message_id": "550e8400-e29b-41d4-a716-446655440000", "role": "user", "content": "test"},
                 headers={"Authorization": "Bearer test_token"}
             )
         
@@ -100,7 +137,7 @@ class TestChatAPIStoreMessage:
             client = TestClient(app)
             response = client.post(
                 "/chat/test_session/add-message",
-                json={"role": "user", "content": "test"}
+                json={"message_id": "550e8400-e29b-41d4-a716-446655440000", "role": "user", "content": "test"}
             )
         
         app.dependency_overrides.clear()
@@ -240,6 +277,32 @@ class TestChatAPIInsertSummary:
         
         assert response.status_code == 200
         assert response.json()["success"] is True
+    
+    def test_insert_summary_with_timestamp(self, client, mock_chat_service):
+        """Test successful summary insertion with provided timestamp."""
+        session_id = "test_session_12345"
+        test_timestamp = datetime.now()
+        summary_data = {
+            "summary": "This is a test summary",
+            "message_count": 10,
+            "timestamp": test_timestamp.isoformat()
+        }
+        
+        mock_chat_service.insert_summary = AsyncMock(return_value=True)
+        
+        with patch('Chat.chat_api.get_current_user', return_value={"user_id": "test_user_12345"}):
+            response = client.post(
+                f"/chat/{session_id}/insert-summary",
+                json=summary_data,
+                headers={"Authorization": "Bearer test_token"}
+            )
+        
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        # Verify timestamp was passed to service
+        mock_chat_service.insert_summary.assert_called_once()
+        call_args = mock_chat_service.insert_summary.call_args
+        assert call_args.kwargs.get('timestamp') is not None
     
     def test_insert_summary_service_not_initialized(self, client):
         """Test insert summary when service is not initialized."""

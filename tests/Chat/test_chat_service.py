@@ -134,6 +134,7 @@ class TestChatServiceStoreMessage:
         result = await initialized_chat_service.store_message(
             sample_message_data['session_id'],
             sample_message_data['user_id'],
+            sample_message_data['message_id'],
             sample_message_data['role'],
             sample_message_data['content']
         )
@@ -152,6 +153,7 @@ class TestChatServiceStoreMessage:
             await chat_service.store_message(
                 sample_message_data['session_id'],
                 sample_message_data['user_id'],
+                sample_message_data['message_id'],
                 sample_message_data['role'],
                 sample_message_data['content']
             )
@@ -168,9 +170,39 @@ class TestChatServiceStoreMessage:
             await initialized_chat_service.store_message(
                 sample_message_data['session_id'],
                 sample_message_data['user_id'],
+                sample_message_data['message_id'],
                 sample_message_data['role'],
                 sample_message_data['content']
             )
+    
+    @pytest.mark.asyncio
+    async def test_store_message_with_timestamp(self, initialized_chat_service, sample_message_data):
+        """Test successful message storage with provided timestamp."""
+        mock_result_set = MagicMock()
+        mock_result_set.result = MagicMock(return_value=None)
+        
+        test_timestamp = datetime.now()
+        
+        async def mock_run_in_executor(executor, func, *args):
+            return func()
+        
+        initialized_chat_service.loop.run_in_executor = AsyncMock(side_effect=mock_run_in_executor)
+        initialized_chat_service.session.execute_async = MagicMock(return_value=mock_result_set)
+        
+        result = await initialized_chat_service.store_message(
+            sample_message_data['session_id'],
+            sample_message_data['user_id'],
+            sample_message_data['message_id'],
+            sample_message_data['role'],
+            sample_message_data['content'],
+            timestamp=test_timestamp
+        )
+        
+        assert result is not None
+        assert 'message_id' in result
+        assert 'timestamp' in result
+        assert result['timestamp'] == test_timestamp
+        assert initialized_chat_service.session.execute_async.called
 
 
 class TestChatServiceGetMessages:
@@ -386,6 +418,31 @@ class TestChatServiceInsertSummary:
                 sample_summary_data['summary'],
                 sample_summary_data['message_count']
             )
+    
+    @pytest.mark.asyncio
+    async def test_insert_summary_with_timestamp(self, initialized_chat_service, sample_summary_data):
+        """Test successful summary insertion with provided timestamp."""
+        mock_result_set = MagicMock()
+        mock_result_set.result = MagicMock(return_value=None)
+        
+        test_timestamp = datetime.now()
+        
+        async def mock_run_in_executor(executor, func, *args):
+            return func()
+        
+        initialized_chat_service.loop.run_in_executor = AsyncMock(side_effect=mock_run_in_executor)
+        initialized_chat_service.session.execute_async = MagicMock(return_value=mock_result_set)
+        
+        result = await initialized_chat_service.insert_summary(
+            sample_summary_data['session_id'],
+            sample_summary_data['user_id'],
+            sample_summary_data['summary'],
+            sample_summary_data['message_count'],
+            timestamp=test_timestamp
+        )
+        
+        assert result is True
+        assert initialized_chat_service.session.execute_async.called
 
 
 class TestChatServiceGetMessageCount:
@@ -605,7 +662,8 @@ class TestChatServiceEdgeCases:
         initialized_chat_service.session.execute_async = MagicMock(return_value=mock_result_set)
         
         # Should not raise error, but may log warnings
-        result = await initialized_chat_service.store_message("", "", "", "")
+        # Note: Empty message_id will fail UUID validation, but testing edge case
+        result = await initialized_chat_service.store_message("", "", "550e8400-e29b-41d4-a716-446655440000", "", "")
         assert result is not None
     
     @pytest.mark.asyncio

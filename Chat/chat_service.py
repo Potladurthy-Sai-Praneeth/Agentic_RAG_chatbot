@@ -5,6 +5,7 @@ from cassandra.cluster import Cluster, Session
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.query import SimpleStatement, ConsistencyLevel
 from cassandra.util import uuid_from_time
+from uuid import UUID
 from cassandra.policies import DCAwareRoundRobinPolicy, TokenAwarePolicy
 import yaml
 import pathlib
@@ -207,20 +208,26 @@ class ChatService:
             logger.error(f"Failed to prepare statements: {e}")
             raise
 
-    async def store_message(self, session_id: str, user_id: str, role: str, content: str):
+    async def store_message(self, session_id: str, user_id: str, message_id: str, role: str, content: str, timestamp: Optional[datetime] = None):
         """Store a chat message asynchronously."""
         if not self._initialized:
             logger.error("CassandraManager not initialized. Call initialize() first.")
             raise Exception("CassandraManager not initialized. Call initialize() first.")
         
         try:
-            message_id = uuid_from_time(datetime.now())
-            timestamp = datetime.now()
+            if timestamp is None:
+                timestamp = datetime.now()
+            # Convert string UUID to UUID object for Cassandra
+            try:
+                message_id_uuid = UUID(message_id)
+            except ValueError as e:
+                logger.error(f"Invalid message_id format: {message_id}")
+                raise ValueError(f"Invalid message_id format: {message_id}") from e
 
             def _execute():
                 future = self.session.execute_async(
                     self.prepared_statements['insert_message'],
-                    (session_id, user_id, message_id, timestamp, role, content)
+                    (session_id, user_id, message_id_uuid, timestamp, role, content)
                 )
                 return future.result()
             await self.loop.run_in_executor(self.executor, _execute)
@@ -305,14 +312,16 @@ class ChatService:
             logger.error(f"Failed to retrieve summary: {e}")
             raise
     
-    async def insert_summary(self, session_id: str, user_id: str, summary: str, message_count: int):
+    async def insert_summary(self, session_id: str, user_id: str, summary: str, message_count: int, timestamp: Optional[datetime] = None):
         """Insert a new session summary asynchronously."""
         if not self._initialized:
             logger.error("CassandraManager not initialized. Call initialize() first.")
             raise Exception("CassandraManager not initialized. Call initialize() first.")
         
         try:
-            last_updated = datetime.now()
+            if timestamp is None:
+                timestamp = datetime.now()
+            last_updated = timestamp
 
             def _execute():
                 future = self.session.execute_async(

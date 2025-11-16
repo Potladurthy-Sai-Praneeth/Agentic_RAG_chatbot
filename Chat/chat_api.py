@@ -89,8 +89,10 @@ async def store_chat_message(session_id: str, chat_message:StoreChatMessageReque
         response = await chat_db.store_message(
             session_id=session_id,
             user_id=user_id,
+            message_id=chat_message.message_id,
             role=chat_message.role,
-            content=chat_message.content
+            content=chat_message.content,
+            timestamp=chat_message.timestamp
         )
         
         if response:
@@ -103,6 +105,12 @@ async def store_chat_message(session_id: str, chat_message:StoreChatMessageReque
             )
     except HTTPException as http_exc:
         raise http_exc
+    except ValueError as ve:
+        logger.error(f"Invalid message_id format: {str(ve)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid message_id format: {str(ve)}"
+        )
     except Exception as e:
         logger.error(f"Error storing chat message: {str(e)}")
         raise HTTPException(
@@ -215,7 +223,8 @@ async def insert_session_summary(session_id: str, summary: InsertSessionSummaryR
             session_id=session_id,
             user_id=user_id,
             summary=summary.summary,
-            message_count=summary.message_count
+            message_count=summary.message_count,
+            timestamp=summary.timestamp
         )
 
         logger.info(f"Inserted session summary for session {session_id}")

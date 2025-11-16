@@ -6,7 +6,7 @@ import os
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
-from User.utils import load_config
+from Chat.utils import load_config
 
 # JWT Configuration
 load_dotenv()

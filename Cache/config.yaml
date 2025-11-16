@@ -1,0 +1,12 @@
+# Redis Configuration
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  decode_responses: true
+  max_connections: 20
+
+
+# Cache and Summarization Configuration
+cache:
+  message_limit: 10 

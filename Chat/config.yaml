@@ -1,0 +1,10 @@
+cassandra:
+  host: "localhost"
+  port: 9042
+  replication_factor: 1
+  max_workers: 10
+
+jwt:
+  access_token_expires: 30
+  refresh_token_expires: 7
+  algorithm: "HS256"

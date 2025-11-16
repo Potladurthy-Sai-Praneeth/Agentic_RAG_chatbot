@@ -366,13 +366,13 @@ async def root():
         "status": "running",
         "version": "1.0.0",
         "endpoints": {
-            "register": "/register",
-            "login": "/login",
-            "add_session": "/add-session",
-            "get_sessions": "/get-sessions",
-            "delete_session": "/delete-session",
-            "delete_user": "/delete-user",
-            "health_check": "/health"
+            "POST /register": "Register a new user",
+            "POST /login": "Login a user",
+            "POST /add-session": "Add a new session",
+            "GET /get-sessions": "Retrieve all sessions for a user",
+            "DELETE /delete-session": "Delete a session",
+            "DELETE /delete-user": "Delete user account",
+            "GET /health": "Health Check Endpoint"
         }
 
     }

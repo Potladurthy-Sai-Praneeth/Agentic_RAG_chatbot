@@ -11,7 +11,7 @@ class RegisterRequestModel(BaseModel):
     username: str = Field(..., description="The user's username")
 class RegisterResponseModel(BaseModel):
    success: bool = Field(..., description="Indicates if the registration was successful")
-   description: str = Field(..., description="Detailed message about the registration outcome")
+   message: str = Field(..., description="Detailed message about the registration outcome")
 
 
 class LoginRequestModel(BaseModel):

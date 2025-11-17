@@ -17,6 +17,13 @@ User/user_api.py
 User/user_response_pydantic_models.py
 User/user_service.py
 User/utils.py
+VectorStore/__init__.py
+VectorStore/document_loader.py
+VectorStore/jwt_utils.py
+VectorStore/utils.py
+VectorStore/vectorstore_api.py
+VectorStore/vectorstore_pydantic_models.py
+VectorStore/vectorstore_service.py
 learning_chatbot.egg-info/PKG-INFO
 learning_chatbot.egg-info/SOURCES.txt
 learning_chatbot.egg-info/dependency_links.txt

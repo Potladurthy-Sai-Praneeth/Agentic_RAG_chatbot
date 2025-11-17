@@ -1,0 +1,17 @@
+# Pinecone Configuration
+pinecone:
+  cloud: "aws"
+  region: "us-east-1"
+  top_k: 5
+
+# Embedding Model Configuration
+models:
+  embedding:
+    provider: "gemini"  # Options: "gemini", "openai"
+    name: "models/embedding-001"
+    dimension: 768  # Dimension for Gemini embedding-001
+
+# Document Processing Configuration
+chunking:
+  chunk_size: 1500  # Increased from 1000 for better context preservation
+  chunk_overlap: 300  # Increased overlap to maintain context across chunks (20% overlap)

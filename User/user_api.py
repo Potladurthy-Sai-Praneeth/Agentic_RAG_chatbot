@@ -1,14 +1,14 @@
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, Dict
 import logging
 from contextlib import asynccontextmanager
-from user_service import UserService
-from user_response_pydantic_models import *
-from utils import *
-from jwt_utils import *
+from User.user_service import UserService
+from User.user_response_pydantic_models import *
+from User.utils import *
+from User.jwt_utils import *
 from datetime import timedelta
 import uvicorn
 

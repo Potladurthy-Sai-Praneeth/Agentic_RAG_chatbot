@@ -622,14 +622,15 @@ class PineconeService:
         """Search for similar documents in Pinecone."""
         # Use provided top_k or fall back to config default
         if top_k is None:
-            top_k = self.config['pinecone'].get('top_k', 5)
+            top_k = self.config['pinecone'].get('top_k', 10)
         
         try:
             results = self.vector_store.similarity_search(
                 query=query,
                 k=top_k,
                 namespace=namespace,
-                filter=filter
+                filter=filter,
+                
             )
             return results
         except Exception as e:

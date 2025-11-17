@@ -2,7 +2,7 @@
 pinecone:
   cloud: "aws"
   region: "us-east-1"
-  top_k: 5
+  top_k: 10
 
 # Embedding Model Configuration
 models:

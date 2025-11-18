@@ -338,7 +338,7 @@ The token should be obtained from the User Service `/login` endpoint. The token 
 ```json
 {
   "query": "What is machine learning?",
-  "top_k": 5,
+  "top_k": 10,
   "namespace": "my-documents",
   "filter": {
     "source_file": "document.pdf"

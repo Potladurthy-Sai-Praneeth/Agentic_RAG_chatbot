@@ -15,3 +15,8 @@ models:
 chunking:
   chunk_size: 1500  # Increased from 1000 for better context preservation
   chunk_overlap: 300  # Increased overlap to maintain context across chunks (20% overlap)
+
+jwt:
+  access_token_expires: 30
+  refresh_token_expires: 7
+  algorithm: "HS256"

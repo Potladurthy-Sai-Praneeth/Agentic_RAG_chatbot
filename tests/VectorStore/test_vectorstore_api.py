@@ -31,7 +31,17 @@ def mock_current_user():
 @pytest.fixture
 def client(mock_pinecone_service):
     """Create a test client with mocked service."""
-    from VectorStore.jwt_utils import get_current_user
+    from VectorStore.jwt_utils import get_current_user, verify_token
+    
+    # Mock verify_token to return a valid payload for test tokens
+    def mock_verify_token(token: str):
+        """Mock verify_token to return valid payload for test tokens."""
+        return {
+            "sub": "test_user_12345",
+            "type": "access",
+            "exp": 9999999999,
+            "iat": 1000000000
+        }
     
     # Override the dependency
     async def override_get_current_user():
@@ -39,8 +49,9 @@ def client(mock_pinecone_service):
     
     app.dependency_overrides[get_current_user] = override_get_current_user
     
-    # Patch the global service
-    with patch('VectorStore.vectorstore_api.pinecone_service', mock_pinecone_service):
+    # Patch verify_token in the middleware and the global service
+    with patch('VectorStore.vectorstore_api.pinecone_service', mock_pinecone_service), \
+         patch('VectorStore.vectorstore_api.verify_token', mock_verify_token):
         yield TestClient(app)
     
     # Cleanup

@@ -30,7 +30,17 @@ def client(mock_cache_service):
     """Create a test client with mocked cache service."""
     from fastapi.testclient import TestClient
     from Cache.cache_api import app
-    from User.jwt_utils import get_current_user
+    from Cache.jwt_utils import get_current_user, verify_token
+    
+    # Mock verify_token to return a valid payload for test tokens
+    def mock_verify_token(token: str):
+        """Mock verify_token to return valid payload for test tokens."""
+        return {
+            "sub": "test_user_12345",
+            "type": "access",
+            "exp": 9999999999,
+            "iat": 1000000000
+        }
     
     # Override the dependency
     async def override_get_current_user():
@@ -38,8 +48,9 @@ def client(mock_cache_service):
     
     app.dependency_overrides[get_current_user] = override_get_current_user
     
-    # Patch the global cache
-    with patch('Cache.cache_api.cache', mock_cache_service):
+    # Patch verify_token in the middleware
+    with patch('Cache.cache_api.cache', mock_cache_service), \
+         patch('Cache.cache_api.verify_token', mock_verify_token):
         yield TestClient(app)
     
     # Cleanup
@@ -103,7 +114,7 @@ class TestCacheAPIAddMessage:
         """Test add message without authentication."""
         from fastapi.testclient import TestClient
         from Cache.cache_api import app
-        from User.jwt_utils import get_current_user
+        from Cache.jwt_utils import get_current_user
         
         # Override dependency to raise HTTPException
         async def override_get_current_user():
@@ -514,7 +525,7 @@ class TestCacheAPIAuthentication:
         """Test that all endpoints require authentication."""
         from fastapi.testclient import TestClient
         from Cache.cache_api import app
-        from User.jwt_utils import get_current_user
+        from Cache.jwt_utils import get_current_user
         
         # Override dependency to raise HTTPException
         async def override_get_current_user():

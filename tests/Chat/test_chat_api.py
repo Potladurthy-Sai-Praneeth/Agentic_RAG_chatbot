@@ -30,6 +30,17 @@ def client(mock_chat_service):
     """Create a test client with mocked chat service."""
     from fastapi.testclient import TestClient
     from Chat.chat_api import app, get_current_user
+    from Chat.jwt_utils import verify_token
+    
+    # Mock verify_token to return a valid payload for test tokens
+    def mock_verify_token(token: str):
+        """Mock verify_token to return valid payload for test tokens."""
+        return {
+            "sub": "test_user_12345",
+            "type": "access",
+            "exp": 9999999999,
+            "iat": 1000000000
+        }
     
     # Override the dependency
     async def override_get_current_user():
@@ -37,8 +48,9 @@ def client(mock_chat_service):
     
     app.dependency_overrides[get_current_user] = override_get_current_user
     
-    # Patch the global chat_db
-    with patch('Chat.chat_api.chat_db', mock_chat_service):
+    # Patch verify_token in the middleware and the global chat_db
+    with patch('Chat.chat_api.chat_db', mock_chat_service), \
+         patch('Chat.chat_api.verify_token', mock_verify_token):
         yield TestClient(app)
     
     # Cleanup
@@ -63,13 +75,11 @@ class TestChatAPIStoreMessage:
             "timestamp": test_timestamp
         })
         
-        # Mock authentication
-        with patch('Chat.chat_api.get_current_user', return_value={"user_id": "test_user_12345"}):
-            response = client.post(
-                f"/chat/{session_id}/add-message",
-                json=message_data,
-                headers={"Authorization": "Bearer test_token"}
-            )
+        response = client.post(
+            f"/chat/{session_id}/add-message",
+            json=message_data,
+            headers={"Authorization": "Bearer test_token"}
+        )
         
         assert response.status_code == 201
         assert response.json()["success"] is True
@@ -92,13 +102,11 @@ class TestChatAPIStoreMessage:
             "timestamp": test_timestamp
         })
         
-        # Mock authentication
-        with patch('Chat.chat_api.get_current_user', return_value={"user_id": "test_user_12345"}):
-            response = client.post(
-                f"/chat/{session_id}/add-message",
-                json=message_data,
-                headers={"Authorization": "Bearer test_token"}
-            )
+        response = client.post(
+            f"/chat/{session_id}/add-message",
+            json=message_data,
+            headers={"Authorization": "Bearer test_token"}
+        )
         
         assert response.status_code == 201
         assert response.json()["success"] is True
@@ -124,7 +132,8 @@ class TestChatAPIStoreMessage:
     def test_store_message_unauthorized(self, mock_chat_service):
         """Test store message without authentication."""
         from fastapi.testclient import TestClient
-        from Chat.chat_api import app, get_current_user
+        from Chat.chat_api import app
+        from Chat.jwt_utils import get_current_user
         from fastapi import HTTPException
         
         # Override dependency to raise HTTPException
@@ -168,11 +177,10 @@ class TestChatAPIGetMessages:
         
         mock_chat_service.get_messages = AsyncMock(return_value=mock_messages)
         
-        with patch('Chat.chat_api.get_current_user', return_value={"user_id": "test_user_12345"}):
-            response = client.get(
-                f"/chat/{session_id}/get-messages",
-                headers={"Authorization": "Bearer test_token"}
-            )
+        response = client.get(
+            f"/chat/{session_id}/get-messages",
+            headers={"Authorization": "Bearer test_token"}
+        )
         
         assert response.status_code == 200
         assert len(response.json()) == 2
@@ -184,11 +192,10 @@ class TestChatAPIGetMessages:
         
         mock_chat_service.get_messages = AsyncMock(return_value=[])
         
-        with patch('Chat.chat_api.get_current_user', return_value={"user_id": "test_user_12345"}):
-            response = client.get(
-                f"/chat/{session_id}/get-messages",
-                headers={"Authorization": "Bearer test_token"}
-            )
+        response = client.get(
+            f"/chat/{session_id}/get-messages",
+            headers={"Authorization": "Bearer test_token"}
+        )
         
         assert response.status_code == 200
         assert response.json() == []
@@ -221,11 +228,10 @@ class TestChatAPIGetSummary:
         
         mock_chat_service.get_summary = AsyncMock(return_value=mock_summary)
         
-        with patch('Chat.chat_api.get_current_user', return_value={"user_id": "test_user_12345"}):
-            response = client.get(
-                f"/chat/{session_id}/get-summary",
-                headers={"Authorization": "Bearer test_token"}
-            )
+        response = client.get(
+            f"/chat/{session_id}/get-summary",
+            headers={"Authorization": "Bearer test_token"}
+        )
         
         assert response.status_code == 200
         assert response.json()["summary"] == "This is a test summary"
@@ -236,11 +242,10 @@ class TestChatAPIGetSummary:
         
         mock_chat_service.get_summary = AsyncMock(return_value=None)
         
-        with patch('Chat.chat_api.get_current_user', return_value={"user_id": "test_user_12345"}):
-            response = client.get(
-                f"/chat/{session_id}/get-summary",
-                headers={"Authorization": "Bearer test_token"}
-            )
+        response = client.get(
+            f"/chat/{session_id}/get-summary",
+            headers={"Authorization": "Bearer test_token"}
+        )
         
         assert response.status_code == 404
     
@@ -268,12 +273,11 @@ class TestChatAPIInsertSummary:
         
         mock_chat_service.insert_summary = AsyncMock(return_value=True)
         
-        with patch('Chat.chat_api.get_current_user', return_value={"user_id": "test_user_12345"}):
-            response = client.post(
-                f"/chat/{session_id}/insert-summary",
-                json=summary_data,
-                headers={"Authorization": "Bearer test_token"}
-            )
+        response = client.post(
+            f"/chat/{session_id}/insert-summary",
+            json=summary_data,
+            headers={"Authorization": "Bearer test_token"}
+        )
         
         assert response.status_code == 200
         assert response.json()["success"] is True
@@ -290,12 +294,11 @@ class TestChatAPIInsertSummary:
         
         mock_chat_service.insert_summary = AsyncMock(return_value=True)
         
-        with patch('Chat.chat_api.get_current_user', return_value={"user_id": "test_user_12345"}):
-            response = client.post(
-                f"/chat/{session_id}/insert-summary",
-                json=summary_data,
-                headers={"Authorization": "Bearer test_token"}
-            )
+        response = client.post(
+            f"/chat/{session_id}/insert-summary",
+            json=summary_data,
+            headers={"Authorization": "Bearer test_token"}
+        )
         
         assert response.status_code == 200
         assert response.json()["success"] is True
@@ -325,11 +328,10 @@ class TestChatAPIGetMessageCount:
         
         mock_chat_service.get_message_count = AsyncMock(return_value=5)
         
-        with patch('Chat.chat_api.get_current_user', return_value={"user_id": "test_user_12345"}):
-            response = client.get(
-                f"/chat/{session_id}/get-message-count",
-                headers={"Authorization": "Bearer test_token"}
-            )
+        response = client.get(
+            f"/chat/{session_id}/get-message-count",
+            headers={"Authorization": "Bearer test_token"}
+        )
         
         assert response.status_code == 200
         assert response.json()["message_count"] == 5
@@ -341,11 +343,10 @@ class TestChatAPIGetMessageCount:
         
         mock_chat_service.get_message_count = AsyncMock(return_value=0)
         
-        with patch('Chat.chat_api.get_current_user', return_value={"user_id": "test_user_12345"}):
-            response = client.get(
-                f"/chat/{session_id}/get-message-count",
-                headers={"Authorization": "Bearer test_token"}
-            )
+        response = client.get(
+            f"/chat/{session_id}/get-message-count",
+            headers={"Authorization": "Bearer test_token"}
+        )
         
         assert response.status_code == 200
         assert response.json()["message_count"] == 0
@@ -370,11 +371,10 @@ class TestChatAPIDeleteSession:
         
         mock_chat_service.delete_session = AsyncMock(return_value=True)
         
-        with patch('Chat.chat_api.get_current_user', return_value={"user_id": "test_user_12345"}):
-            response = client.delete(
-                f"/chat/{session_id}/delete",
-                headers={"Authorization": "Bearer test_token"}
-            )
+        response = client.delete(
+            f"/chat/{session_id}/delete",
+            headers={"Authorization": "Bearer test_token"}
+        )
         
         assert response.status_code == 200
         assert response.json()["success"] is True

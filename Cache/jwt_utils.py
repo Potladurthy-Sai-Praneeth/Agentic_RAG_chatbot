@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 import os
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
-from Chat.utils import load_config
+from Cache.utils import load_config
+from Cache.context import current_jwt_token
 
 # JWT Configuration
 load_dotenv()
@@ -69,10 +70,17 @@ def verify_token(token: str) -> dict:
         )
 
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def get_current_user()-> Dict:
     """Dependency to get current authenticated user"""
-    token = credentials.credentials
-    payload = verify_token(token)
+    payload = current_jwt_token.get()
+    
+    # Check if token was provided (contextVar is empty if no token was set)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     # Check if token type is access
     if payload.get("type") != "access":

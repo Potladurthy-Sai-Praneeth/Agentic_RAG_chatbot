@@ -11,6 +11,8 @@ from User.utils import *
 from User.jwt_utils import *
 from datetime import timedelta
 import uvicorn
+from fastapi import Request, Response
+from User.context import current_jwt_token
 
 
 # Configure logging
@@ -58,6 +60,37 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    token_resetter = None
+    auth_header = request.headers.get("Authorization")
+    
+    try:
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1].strip()
+            user_data = verify_token(token)
+            
+            # SET THE CONTEXTVAR
+            token_resetter = current_jwt_token.set(user_data)
+        
+        response = await call_next(request)
+        
+    except HTTPException as http_exc:
+        # Re-raise HTTPException to preserve error details
+        raise http_exc
+    except Exception as e:
+        # Return a 401 Unauthorized response for other exceptions
+        logger.error(f"Authentication error: {str(e)}")
+        response = Response("Unauthorized", status_code=401)
+        
+    finally:
+        # Always reset the contextvar after the request is done
+        if token_resetter:
+            current_jwt_token.reset(token_resetter)
+            
+    return response
 
 
 @app.post("/register", 

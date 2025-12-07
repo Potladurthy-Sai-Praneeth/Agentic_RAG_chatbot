@@ -266,7 +266,88 @@ async def get_sessions(current_user: Dict = Depends(get_current_user)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
         )
+    
+@app.get('/user/{session_id}/get-session-title',
+         response_model=GetSessionTitleResponseModel,
+         status_code=status.HTTP_200_OK,
+         summary="Get session title",
+         description="Endpoint to retrieve the title of a specific session associated with the authenticated user.")
+async def get_session_title(session_id: str, current_user: Dict = Depends(get_current_user)):
+    try:
+        if not user_db:
+            logger.error("User database not initialized")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="User database service is not available"
+            )
+        
+        user_id = current_user.get("user_id")
+        if not user_id:
+            logger.error("User ID not found in token payload")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials"
+            )
 
+        title = await user_db.get_session_title(user_id, session_id)
+        logger.info(f"Title for session {session_id} retrieved successfully for user_id:{user_id}")
+        return GetSessionTitleResponseModel(
+            success=True,
+            title=title
+        )
+    
+    except HTTPException as http_exc:
+       raise http_exc
+    except Exception as e:
+       raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@app.post("/user/{session_id}/set-session-title", response_model=SetSessionTitleResponseModel,
+          status_code=status.HTTP_200_OK,
+          summary="Set session title",
+          description="Endpoint to set the title of a specific session associated with the authenticated user.")
+async def set_session_title(session_id: str, title_request: SetSessionTitleRequestModel, current_user: Dict = Depends(get_current_user)):
+    try:
+        if not user_db:
+            logger.error("User database not initialized")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="User database service is not available"
+            )
+        
+        user_id = current_user.get("user_id")
+        if not user_id:
+            logger.error("User ID not found in token payload")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials"
+            )
+
+        updated = await user_db.update_title(user_id, session_id, title_request.title)
+
+        if not updated:
+            logger.warning(f"Failed to set title for session_id:{session_id}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to set session title."
+            )
+
+        logger.info(f"Title for session {session_id} set successfully for user_id:{user_id}")
+        return SetSessionTitleResponseModel(
+            success=True,
+            message="Session title set successfully."
+        )
+    
+    except HTTPException as http_exc:
+       raise http_exc
+    except Exception as e:
+       raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+    
 @app.delete('/user/delete-session',
             status_code=status.HTTP_200_OK,
             response_model = DeleteSessionResponseModel,
@@ -405,7 +486,9 @@ async def root():
             "GET /user/get-sessions": "Retrieve all sessions for a user",
             "DELETE /user/delete-session": "Delete a session",
             "DELETE /user/delete-user": "Delete user account",
-            "GET /health": "Health Check Endpoint"
+            "GET /health": "Health Check Endpoint",
+            "POST /user/{session_id}/set-session-title": "Set the title of a specific session",
+            "GET /user/{session_id}/get-session-title": "Get the title of a specific session"
         }
 
     }

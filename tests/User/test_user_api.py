@@ -337,9 +337,9 @@ class TestUserAPIGetSessions:
     def test_get_sessions_success(self, client, mock_user_service):
         """Test successful session retrieval."""
         mock_sessions = [
-            {"session_id": "session_1", "created_at": datetime.now()},
-            {"session_id": "session_2", "created_at": datetime.now()},
-            {"session_id": "session_3", "created_at": datetime.now()}
+            {"session_id": "session_1", "created_at": datetime.now(), "title": "Session 1"},
+            {"session_id": "session_2", "created_at": datetime.now(), "title": None},
+            {"session_id": "session_3", "created_at": datetime.now(), "title": "Session 3"}
         ]
         
         mock_user_service.get_sessions = AsyncMock(return_value=mock_sessions)
@@ -673,6 +673,8 @@ class TestUserAPIAuthentication:
             endpoints = [
                 ("POST", "/user/add-session", {"session_id": "test_session"}),
                 ("GET", "/user/get-sessions", None),
+                ("GET", "/user/test_session/get-session-title", None),
+                ("POST", "/user/test_session/set-session-title", {"title": "Test Title"}),
                 ("DELETE", "/user/delete-session", {"session_id": "test_session"}),
                 ("DELETE", "/user/delete-user", None),
             ]
@@ -760,4 +762,194 @@ class TestUserAPIAuthentication:
             
             # With contextVar-based auth, missing token results in 401 (not 403)
             assert response.status_code == 401
+
+
+class TestUserAPIGetSessionTitle:
+    """Tests for GET /user/{session_id}/get-session-title endpoint."""
+    
+    def test_get_session_title_success(self, client, mock_user_service):
+        """Test successful session title retrieval."""
+        mock_user_service.get_session_title = AsyncMock(return_value="My Session Title")
+        
+        token = create_access_token(data={"sub": "test_user_12345"})
+        
+        response = client.get(
+            "/user/test_session_12345/get-session-title",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        assert response.json()["title"] == "My Session Title"
+        mock_user_service.get_session_title.assert_called_once_with("test_user_12345", "test_session_12345")
+    
+    def test_get_session_title_none(self, client, mock_user_service):
+        """Test get session title when title is not set."""
+        mock_user_service.get_session_title = AsyncMock(return_value=None)
+        
+        token = create_access_token(data={"sub": "test_user_12345"})
+        
+        response = client.get(
+            "/user/test_session_12345/get-session-title",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        assert response.json()["title"] is None
+    
+    def test_get_session_title_service_not_initialized(self, client):
+        """Test get session title when service is not initialized."""
+        token = create_access_token(data={"sub": "test_user_12345"})
+        
+        with patch('User.user_api.user_db', None):
+            response = client.get(
+                "/user/test_session_12345/get-session-title",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+        
+        assert response.status_code == 503
+    
+    def test_get_session_title_unauthorized(self, mock_user_service):
+        """Test get session title without authentication."""
+        from fastapi.testclient import TestClient
+        from User.user_api import app
+        from User.jwt_utils import get_current_user
+        
+        async def override_get_current_user():
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        with patch('User.user_api.user_db', mock_user_service):
+            client = TestClient(app)
+            response = client.get("/user/test_session_12345/get-session-title")
+        
+        app.dependency_overrides.clear()
+        assert response.status_code == 401
+    
+    def test_get_session_title_service_error(self, client, mock_user_service):
+        """Test get session title when service raises error."""
+        mock_user_service.get_session_title = AsyncMock(side_effect=Exception("Database error"))
+        
+        token = create_access_token(data={"sub": "test_user_12345"})
+        
+        response = client.get(
+            "/user/test_session_12345/get-session-title",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 500
+
+
+class TestUserAPISetSessionTitle:
+    """Tests for POST /user/{session_id}/set-session-title endpoint."""
+    
+    def test_set_session_title_success(self, client, mock_user_service):
+        """Test successful session title update."""
+        title_data = {
+            "title": "My New Session Title"
+        }
+        
+        mock_user_service.update_title = AsyncMock(return_value=True)
+        
+        token = create_access_token(data={"sub": "test_user_12345"})
+        
+        response = client.post(
+            "/user/test_session_12345/set-session-title",
+            json=title_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        assert "set successfully" in response.json()["message"].lower()
+        mock_user_service.update_title.assert_called_once_with("test_user_12345", "test_session_12345", "My New Session Title")
+    
+    def test_set_session_title_failed(self, client, mock_user_service):
+        """Test session title update when it fails."""
+        title_data = {
+            "title": "My New Session Title"
+        }
+        
+        mock_user_service.update_title = AsyncMock(return_value=False)
+        
+        token = create_access_token(data={"sub": "test_user_12345"})
+        
+        response = client.post(
+            "/user/test_session_12345/set-session-title",
+            json=title_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 400
+        assert "Failed to set session title" in response.json()["detail"]
+    
+    def test_set_session_title_service_not_initialized(self, client):
+        """Test set session title when service is not initialized."""
+        title_data = {
+            "title": "My New Session Title"
+        }
+        
+        token = create_access_token(data={"sub": "test_user_12345"})
+        
+        with patch('User.user_api.user_db', None):
+            response = client.post(
+                "/user/test_session_12345/set-session-title",
+                json=title_data,
+                headers={"Authorization": f"Bearer {token}"}
+            )
+        
+        assert response.status_code == 503
+    
+    def test_set_session_title_unauthorized(self, mock_user_service):
+        """Test set session title without authentication."""
+        from fastapi.testclient import TestClient
+        from User.user_api import app
+        from User.jwt_utils import get_current_user
+        
+        async def override_get_current_user():
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        with patch('User.user_api.user_db', mock_user_service):
+            client = TestClient(app)
+            response = client.post(
+                "/user/test_session_12345/set-session-title",
+                json={"title": "My New Session Title"}
+            )
+        
+        app.dependency_overrides.clear()
+        assert response.status_code == 401
+    
+    def test_set_session_title_service_error(self, client, mock_user_service):
+        """Test set session title when service raises error."""
+        title_data = {
+            "title": "My New Session Title"
+        }
+        
+        mock_user_service.update_title = AsyncMock(side_effect=Exception("Database error"))
+        
+        token = create_access_token(data={"sub": "test_user_12345"})
+        
+        response = client.post(
+            "/user/test_session_12345/set-session-title",
+            json=title_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 500
+    
+    def test_set_session_title_missing_title(self, client, mock_user_service):
+        """Test set session title with missing title field."""
+        token = create_access_token(data={"sub": "test_user_12345"})
+        
+        response = client.post(
+            "/user/test_session_12345/set-session-title",
+            json={},
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 422  # Validation error
 

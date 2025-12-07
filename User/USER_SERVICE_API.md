@@ -17,7 +17,7 @@ Most endpoints require JWT Bearer token authentication. Include the token in the
 Authorization: Bearer <access_token>
 ```
 
-The token is obtained from the `/login` endpoint. The token payload contains:
+The token is obtained from the `/user/login` endpoint. The token payload contains:
 - `sub`: User ID
 - `type`: "access"
 - `exp`: Expiration timestamp
@@ -295,7 +295,63 @@ The token is obtained from the `/login` endpoint. The token payload contains:
 
 ---
 
-### 7. Health Check
+### 7. Set Session Title
+**Endpoint**: `POST /user/{session_id}/set-session-title`
+**Description**: Set the title for a specific session of the authenticated user.
+**Authentication**: Required (Bearer Token)
+**Request Body**:
+```json
+{
+  "title": "My Session Title"
+}
+```
+**Request Model**: `SetSessionTitleRequestModel`
+- `title` (string, required): The title to set for the session
+**Response**: `200 OK`
+**Response Model**: `SetSessionTitleResponseModel`
+```json
+{
+  "success": true,
+  "message": "string"
+}
+```
+**Response Fields**:
+- `success` (boolean): Indicates if the title update was successful
+- `message` (string): Detailed message about the title update outcome
+**Error Responses**:
+- `401 Unauthorized`: Invalid or missing authentication token   
+- `400 Bad Request`: Failed to set session title (session not found or does not belong to user)  
+- `503 Service Unavailable`: User database service is not available  
+- `500 Internal Server Error`: Internal server error
+**Notes**:
+- User ID is extracted from the JWT token
+- Only sessions belonging to the authenticated user can be updated    
+
+### 8. Get Session Title
+**Endpoint**: `GET /user/{session_id}/get-session-title`
+**Description**: Get the title for a specific session of the authenticated user.
+**Authentication**: Required (Bearer Token)
+**Response**: `200 OK`
+**Response Model**: `GetSessionTitleResponseModel`
+```json
+{
+  "session_id": "string",
+  "title": "string"
+} 
+```
+  
+**Response Fields**:
+- `session_id` (string): The session ID
+- `title` (string): The title of the session
+**Error Responses**:
+- `401 Unauthorized`: Invalid or missing authentication token   
+- `400 Bad Request`: Failed to get session title (session not found or does not belong to user)  
+- `503 Service Unavailable`: User database service is not available  
+- `500 Internal Server Error`: Internal server error  
+   
+---
+
+### 9. Health Check
 
 **Endpoint**: `GET /health`
 
@@ -346,7 +402,9 @@ The token is obtained from the `/login` endpoint. The token payload contains:
     "GET /get-sessions": "Retrieve all sessions for a user",
     "DELETE /delete-session": "Delete a session",
     "DELETE /delete-user": "Delete user account",
-    "GET /health": "Health Check Endpoint"
+    "GET /health": "Health Check Endpoint",
+    "POST /user/{session_id}/set-session-title": "Set the title of a specific session",
+    "GET /user/{session_id}/get-session-title": "Get the title of a specific session"
   }
 }
 ```

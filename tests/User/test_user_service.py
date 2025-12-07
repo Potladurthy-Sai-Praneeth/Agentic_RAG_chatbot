@@ -427,12 +427,14 @@ class TestUserServiceGetSessions:
         # Mock session records
         mock_session1 = {
             'session_id': 'session1',
-            'created_at': datetime.now()
+            'created_at': datetime.now(),
+            'title': 'Session 1'
         }
         
         mock_session2 = {
             'session_id': 'session2',
-            'created_at': datetime.now()
+            'created_at': datetime.now(),
+            'title': None
         }
         
         mock_connection.fetch = AsyncMock(return_value=[mock_session1, mock_session2])
@@ -473,6 +475,130 @@ class TestUserServiceGetSessions:
         
         with pytest.raises(Exception, match="Database error"):
             await user_service.get_sessions(sample_session_data['user_id'])
+
+
+class TestUserServiceGetSessionTitle:
+    """Tests for the get_session_title() method."""
+    
+    @pytest.mark.asyncio
+    async def test_get_session_title_success(self, user_service, mock_db_pool, mock_connection, sample_session_data):
+        """Test successful session title retrieval."""
+        user_service.pool = mock_db_pool
+        mock_db_pool.acquire = MagicMock(return_value=create_async_context_manager(mock_connection))
+        
+        mock_connection.fetchval = AsyncMock(return_value="My Session Title")
+        
+        title = await user_service.get_session_title(
+            sample_session_data['user_id'],
+            sample_session_data['session_id']
+        )
+        
+        assert title == "My Session Title"
+        assert mock_connection.fetchval.called
+    
+    @pytest.mark.asyncio
+    async def test_get_session_title_none(self, user_service, mock_db_pool, mock_connection, sample_session_data):
+        """Test get_session_title() when title is not set."""
+        user_service.pool = mock_db_pool
+        mock_db_pool.acquire = MagicMock(return_value=create_async_context_manager(mock_connection))
+        
+        mock_connection.fetchval = AsyncMock(return_value=None)
+        
+        title = await user_service.get_session_title(
+            sample_session_data['user_id'],
+            sample_session_data['session_id']
+        )
+        
+        assert title is None
+    
+    @pytest.mark.asyncio
+    async def test_get_session_title_without_pool_raises_error(self, user_service, sample_session_data):
+        """Test that get_session_title() raises error when pool is not initialized."""
+        user_service.pool = None
+        
+        with pytest.raises(RuntimeError, match="Unable to connect to the database"):
+            await user_service.get_session_title(
+                sample_session_data['user_id'],
+                sample_session_data['session_id']
+            )
+    
+    @pytest.mark.asyncio
+    async def test_get_session_title_handles_exceptions(self, user_service, mock_db_pool, mock_connection, sample_session_data):
+        """Test that get_session_title() properly handles exceptions."""
+        user_service.pool = mock_db_pool
+        mock_db_pool.acquire = MagicMock(return_value=create_async_context_manager(mock_connection))
+        
+        mock_connection.fetchval = AsyncMock(side_effect=Exception("Database error"))
+        
+        with pytest.raises(Exception, match="Database error"):
+            await user_service.get_session_title(
+                sample_session_data['user_id'],
+                sample_session_data['session_id']
+            )
+
+
+class TestUserServiceUpdateTitle:
+    """Tests for the update_title() method."""
+    
+    @pytest.mark.asyncio
+    async def test_update_title_success(self, user_service, mock_db_pool, mock_connection, sample_session_data):
+        """Test successful session title update."""
+        user_service.pool = mock_db_pool
+        mock_db_pool.acquire = MagicMock(return_value=create_async_context_manager(mock_connection))
+        
+        mock_connection.execute = AsyncMock(return_value="UPDATE 1")
+        
+        result = await user_service.update_title(
+            sample_session_data['user_id'],
+            sample_session_data['session_id'],
+            "New Title"
+        )
+        
+        assert result is True
+        assert mock_connection.execute.called
+    
+    @pytest.mark.asyncio
+    async def test_update_title_not_found(self, user_service, mock_db_pool, mock_connection, sample_session_data):
+        """Test update_title() when session doesn't exist."""
+        user_service.pool = mock_db_pool
+        mock_db_pool.acquire = MagicMock(return_value=create_async_context_manager(mock_connection))
+        
+        mock_connection.execute = AsyncMock(return_value="UPDATE 0")
+        
+        result = await user_service.update_title(
+            sample_session_data['user_id'],
+            sample_session_data['session_id'],
+            "New Title"
+        )
+        
+        assert result is False
+    
+    @pytest.mark.asyncio
+    async def test_update_title_without_pool_raises_error(self, user_service, sample_session_data):
+        """Test that update_title() raises error when pool is not initialized."""
+        user_service.pool = None
+        
+        with pytest.raises(RuntimeError, match="Unable to connect to the database"):
+            await user_service.update_title(
+                sample_session_data['user_id'],
+                sample_session_data['session_id'],
+                "New Title"
+            )
+    
+    @pytest.mark.asyncio
+    async def test_update_title_handles_exceptions(self, user_service, mock_db_pool, mock_connection, sample_session_data):
+        """Test that update_title() properly handles exceptions."""
+        user_service.pool = mock_db_pool
+        mock_db_pool.acquire = MagicMock(return_value=create_async_context_manager(mock_connection))
+        
+        mock_connection.execute = AsyncMock(side_effect=Exception("Database error"))
+        
+        with pytest.raises(Exception, match="Database error"):
+            await user_service.update_title(
+                sample_session_data['user_id'],
+                sample_session_data['session_id'],
+                "New Title"
+            )
 
 
 class TestUserServiceDeleteSession:

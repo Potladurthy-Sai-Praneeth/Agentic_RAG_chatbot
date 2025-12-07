@@ -26,6 +26,8 @@ class LoginResponseModel(BaseModel):
 
 class AddSessionRequestModel(BaseModel):
     session_id: str = Field(..., description="The session ID to be added to the user profile")
+    created_at: Optional[datetime] = Field(None, description="The creation time of the session")
+
 class AddSessionResponseModel(BaseModel):
     success: bool = Field(..., description="Indicates if the session addition was successful")
     message: str = Field(..., description="Detailed message about the session addition outcome")
@@ -44,6 +46,17 @@ class DeleteSessionResponseModel(BaseModel):
     success: bool = Field(..., description="Indicates if the session deletion was successful")
     message: str = Field(..., description="Detailed message about the session deletion outcome")
 
+
+class GetSessionTitleResponseModel(BaseModel):
+    success: bool = Field(..., description="Indicates if the retrieval was successful")
+    title: Optional[str] = Field(None, description="The title of the session")
+
+class SetSessionTitleRequestModel(BaseModel):
+    title: str = Field(..., description="The title to set for the session")
+
+class SetSessionTitleResponseModel(BaseModel):
+    success: bool = Field(..., description="Indicates if the title update was successful")
+    message: str = Field(..., description="Detailed message about the title update outcome")
 
 class DeleteUserRequestModel(BaseModel):
     pass

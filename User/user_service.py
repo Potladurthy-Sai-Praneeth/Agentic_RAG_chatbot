@@ -110,6 +110,7 @@ class UserService:
                     CREATE TABLE IF NOT EXISTS user_sessions (
                         session_id VARCHAR(64) PRIMARY KEY,
                         user_id VARCHAR(64) NOT NULL,
+                        title VARCHAR(255),
                         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         CONSTRAINT fk_user_id FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
                     );
@@ -262,7 +263,7 @@ class UserService:
         async with self.pool.acquire() as conn:
             try:
                 sessions = await conn.fetch("""
-                    SELECT session_id, created_at FROM user_sessions WHERE user_id = $1;
+                    SELECT session_id, created_at, title FROM user_sessions WHERE user_id = $1;
                 """, user_id)
 
                 logger.info(f"Retrieved sessions for user {user_id}")
@@ -271,7 +272,54 @@ class UserService:
             except Exception as e:
                 logger.error(f"Error retrieving sessions for user {user_id}: {e}")
                 raise
+
+    async def get_session_title(self, user_id: str, session_id: str) -> Optional[str]:
+        """Retrieve the title of a specific session for a user."""
+        if not self.pool:
+            logger.error("Database pool is not initialized")
+            raise RuntimeError("Unable to connect to the database")
+
+        async with self.pool.acquire() as conn:
+            try:
+                title = await conn.fetchval("""
+                    SELECT title FROM user_sessions WHERE user_id = $1 AND session_id = $2;
+                """, user_id, session_id)
+
+                if title is None:
+                    logger.info(f"Title not set for session {session_id} of user {user_id}")
+                    return None
+
+                logger.info(f"Retrieved title for session {session_id} of user {user_id}")
+                return title
+
+            except Exception as e:
+                logger.error(f"Error retrieving title for session {session_id} of user {user_id}: {e}")
+                raise
     
+    async def update_title(self, user_id: str, session_id: str, title: str) -> bool:
+        """Update the title of a specific session for a user."""
+        if not self.pool:
+            logger.error("Database pool is not initialized")
+            raise RuntimeError("Unable to connect to the database")
+
+        async with self.pool.acquire() as conn:
+            try:
+                result = await conn.execute("""
+                    UPDATE user_sessions SET title = $1 WHERE user_id = $2 AND session_id = $3;
+                """, title, user_id, session_id)
+
+                if result == "UPDATE 0":
+                    logger.warning(f"No session {session_id} found for user {user_id}")
+                    return False
+
+                logger.info(f"Session {session_id} title updated for user {user_id}")
+                return True
+
+            except Exception as e:
+                logger.error(f"Error updating title for session {session_id} of user {user_id}: {e}")
+                raise
+
+
     async def delete_session(self, user_id: str, session_id: str) -> bool:
         """Delete a specific session for a user."""
         if not self.pool:

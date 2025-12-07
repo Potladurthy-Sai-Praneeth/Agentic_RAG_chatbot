@@ -56,7 +56,8 @@ The token should be obtained from the User Service `/login` endpoint. The token 
 ```json
 {
   "message": "Message added successfully",
-  "needs_summarization": false
+  "needs_summarization": false,
+  "success": true
 }
 ```
 

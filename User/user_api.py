@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
 
     try:
         user_db = UserService()
-        await user_db.connect()
+        await user_db.initialize()
         logger.info("Connected to the user database.")
         yield
     except Exception as e:
@@ -93,7 +93,7 @@ async def auth_middleware(request: Request, call_next):
     return response
 
 
-@app.post("/register", 
+@app.post("/user/register", 
           response_model=RegisterResponseModel, 
           status_code=status.HTTP_201_CREATED,
           summary="Register a new user",
@@ -137,7 +137,7 @@ async def register_user(user: RegisterRequestModel):
         )
     
 
-@app.post("/login", 
+@app.post("/user/login", 
           response_model=LoginResponseModel, 
           status_code=status.HTTP_200_OK,
           summary="User login",
@@ -186,7 +186,7 @@ async def login_user(login_request: LoginRequestModel):
             detail=f"Internal server error: {str(e)}"
         )
 
-@app.post('/add-session', 
+@app.post('/user/add-session', 
           response_model= AddSessionResponseModel,
           status_code=status.HTTP_200_OK,
           summary="Add session to user Profile",
@@ -230,7 +230,7 @@ async def add_session_to_user(session: AddSessionRequestModel, current_user: Dic
             detail=f"Internal server error: {str(e)}"
         )
 
-@app.get('/get-sessions',
+@app.get('/user/get-sessions',
          response_model=GetSessionsResponseModel,
          status_code=status.HTTP_200_OK,
          summary="Get user sessions",
@@ -267,7 +267,7 @@ async def get_sessions(current_user: Dict = Depends(get_current_user)):
             detail=f"Internal server error: {str(e)}"
         )
 
-@app.delete('/delete-session',
+@app.delete('/user/delete-session',
             status_code=status.HTTP_200_OK,
             response_model = DeleteSessionResponseModel,
             summary="Delete a user session",
@@ -312,7 +312,7 @@ async def delete_session(session: DeleteSessionRequestModel, current_user: Dict 
             detail=f"Internal server error: {str(e)}"
         )
 
-@app.delete('/delete-user',
+@app.delete('/user/delete-user',
             status_code=status.HTTP_200_OK,
             response_model=DeleteUserResponseModel,
             summary="Delete user account",
@@ -399,12 +399,12 @@ async def root():
         "status": "running",
         "version": "1.0.0",
         "endpoints": {
-            "POST /register": "Register a new user",
-            "POST /login": "Login a user",
-            "POST /add-session": "Add a new session",
-            "GET /get-sessions": "Retrieve all sessions for a user",
-            "DELETE /delete-session": "Delete a session",
-            "DELETE /delete-user": "Delete user account",
+            "POST /user/register": "Register a new user",
+            "POST /user/login": "Login a user",
+            "POST /user/add-session": "Add a new session",
+            "GET /user/get-sessions": "Retrieve all sessions for a user",
+            "DELETE /user/delete-session": "Delete a session",
+            "DELETE /user/delete-user": "Delete user account",
             "GET /health": "Health Check Endpoint"
         }
 

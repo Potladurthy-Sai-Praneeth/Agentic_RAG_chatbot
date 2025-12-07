@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from pydantic.networks import EmailStr
 from datetime import datetime
 
@@ -35,7 +35,7 @@ class GetSessionsRequestModel(BaseModel):
     pass
 class GetSessionsResponseModel(BaseModel):
     success: bool = Field(..., description="Indicates if the retrieval was successful")
-    sessions: Dict[str, datetime] = Field(..., description="Dictionary of session IDs and their creation timestamps")
+    sessions: List[Dict] = Field(..., description="List of session dictionaries containing session_id and created_at")
 
 
 class DeleteSessionRequestModel(BaseModel):

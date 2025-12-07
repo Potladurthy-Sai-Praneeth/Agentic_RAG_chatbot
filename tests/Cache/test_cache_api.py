@@ -291,7 +291,7 @@ class TestCacheAPITrimCache:
         
         assert response.status_code == 200
         assert response.json()["message"] == "Cache trimmed successfully"
-        assert response.json()["needs_summarization"] is True
+        assert response.json()["success"] is True
     
     def test_trim_cache_no_trim_needed(self, client, mock_cache_service):
         """Test trim cache when trimming is not needed."""
@@ -305,7 +305,7 @@ class TestCacheAPITrimCache:
         )
         
         assert response.status_code == 200
-        assert response.json()["needs_summarization"] is False
+        assert response.json()["success"] is False
     
     def test_trim_cache_without_keep_last(self, client, mock_cache_service):
         """Test trim cache without keep_last parameter."""

@@ -124,7 +124,8 @@ async def add_message(session_id: str, message: AddMessageRequestModel, current_
         logger.info(f"Message added to cache for session {session_id} by user {user_id}")
         return AddMessageResponseModel(
             message="Message added successfully",
-            needs_summarization=needs_summarization
+            needs_summarization=needs_summarization,
+            success=True
         )
     except HTTPException as http_exc:
         raise http_exc
@@ -139,7 +140,7 @@ async def add_message(session_id: str, message: AddMessageRequestModel, current_
          summary="Retrieve messages from the cache",
          response_description="List of cached messages",
          response_model= List[GetCachedMessagesResponseModel])
-async def get_messages(session_id: str, limit: Optional[int] = None, current_user: Dict = Depends(get_current_user)):
+async def get_messages(session_id: str, limit: Optional[int] = 0, current_user: Dict = Depends(get_current_user)):
     """Retrieve messages from the cache for a given session."""
     if not cache:
         logger.error("Cache service not initialized")
@@ -226,11 +227,11 @@ async def trim_cache(session_id: str, keep_last: Optional[int] = Query(None, gt=
                 detail="Could not validate credentials"
             )
         
-        needs_summ = cache.trim_cache(session_id, keep_last)
+        suc = cache.trim_cache(session_id, keep_last)
         logger.info(f"Trimmed cache for session {session_id} by user {user_id}")
         return TrimCacheResponseModel(
             message="Cache trimmed successfully",
-            needs_summarization=needs_summ
+            success=suc
         )
     except HTTPException as http_exc:
         raise http_exc
@@ -353,6 +354,41 @@ async def clear_cache(session_id: str, current_user: Dict = Depends(get_current_
             detail=f"Failed to clear cache: {str(e)}"
             )
 
+@app.get("/cache/{session_id}/session-exists", status_code=status.HTTP_200_OK,
+         summary="Check if a session exists in the cache",
+         response_description="Session existence status",
+         response_model= SessionExistsResponseModel)
+async def session_exists(session_id: str, current_user: Dict = Depends(get_current_user)):
+    """Check if a session exists in the cache."""
+    if not cache:
+        logger.error("Cache service not initialized")
+        raise HTTPException(
+            status_code = status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Cache service not initialized"
+        )
+
+    try:
+        user_id = current_user.get("user_id")
+        if not user_id:
+            logger.error("User ID not found in token payload")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials"
+            )
+        
+        exists = cache.check_session_existence(session_id)
+        logger.info(f"Checked existence of session {session_id} in cache by user {user_id}")
+        return SessionExistsResponseModel(exists=exists, success=True)
+    
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        logger.error(f"Error checking session existence in cache: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Failed to check session existence in cache: {str(e)}"
+            )
+
 @app.get("/health", status_code=status.HTTP_200_OK,
          summary="Health check for the Cache Service",
          response_description="Health check status",
@@ -406,7 +442,8 @@ async def root():
            "POST /cache/{session_id}/update-summary": "Update session summary in the cache",
            "GET /cache/{session_id}/get-summary": "Get session summary from the cache",
            "DELETE /cache/{session_id}/clear": "Clear the cache for a session",
-           "GET /health": "Health check for the Cache Service"  
+           "GET /cache/{session_id}/session-exists": "Check if a session exists in the cache",
+           "GET /health": "Health check for the Cache Service"  ,
         }
     }
 

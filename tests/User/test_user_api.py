@@ -72,7 +72,7 @@ class TestUserAPIRegister:
         
         mock_user_service.register_user = AsyncMock(return_value="test_user_12345")
         
-        response = client.post("/register", json=user_data)
+        response = client.post("/user/register", json=user_data)
         
         assert response.status_code == 201
         assert response.json()["success"] is True
@@ -91,7 +91,7 @@ class TestUserAPIRegister:
         
         mock_user_service.register_user = AsyncMock(return_value=None)
         
-        response = client.post("/register", json=user_data)
+        response = client.post("/user/register", json=user_data)
         
         assert response.status_code == 201  # API returns 201 even on failure
         assert response.json()["success"] is False
@@ -106,7 +106,7 @@ class TestUserAPIRegister:
         }
         
         with patch('User.user_api.user_db', None):
-            response = client.post("/register", json=user_data)
+            response = client.post("/user/register", json=user_data)
         
         assert response.status_code == 503
         assert "not available" in response.json()["detail"].lower()
@@ -119,7 +119,7 @@ class TestUserAPIRegister:
             "password": "password123"
         }
         
-        response = client.post("/register", json=user_data)
+        response = client.post("/user/register", json=user_data)
         
         assert response.status_code == 422  # Validation error
     
@@ -131,7 +131,7 @@ class TestUserAPIRegister:
             "password": "short"
         }
         
-        response = client.post("/register", json=user_data)
+        response = client.post("/user/register", json=user_data)
         
         assert response.status_code == 422  # Validation error
     
@@ -145,7 +145,7 @@ class TestUserAPIRegister:
         
         mock_user_service.register_user = AsyncMock(side_effect=Exception("Database error"))
         
-        response = client.post("/register", json=user_data)
+        response = client.post("/user/register", json=user_data)
         
         assert response.status_code == 500
         assert "Internal server error" in response.json()["detail"]
@@ -163,7 +163,7 @@ class TestUserAPILogin:
         
         mock_user_service.login = AsyncMock(return_value="test_user_12345")
         
-        response = client.post("/login", json=login_data)
+        response = client.post("/user/login", json=login_data)
         
         assert response.status_code == 200
         assert response.json()["token_type"] == "bearer"
@@ -181,7 +181,7 @@ class TestUserAPILogin:
         
         mock_user_service.login = AsyncMock(return_value="test_user_12345")
         
-        response = client.post("/login", json=login_data)
+        response = client.post("/user/login", json=login_data)
         
         assert response.status_code == 200
         assert response.json()["token_type"] == "bearer"
@@ -196,7 +196,7 @@ class TestUserAPILogin:
         
         mock_user_service.login = AsyncMock(return_value=None)
         
-        response = client.post("/login", json=login_data)
+        response = client.post("/user/login", json=login_data)
         
         assert response.status_code == 401
         assert "Invalid email or password" in response.json()["detail"]
@@ -209,7 +209,7 @@ class TestUserAPILogin:
         }
         
         with patch('User.user_api.user_db', None):
-            response = client.post("/login", json=login_data)
+            response = client.post("/user/login", json=login_data)
         
         assert response.status_code == 503
         assert "not available" in response.json()["detail"].lower()
@@ -223,7 +223,7 @@ class TestUserAPILogin:
         
         mock_user_service.login = AsyncMock(side_effect=Exception("Database error"))
         
-        response = client.post("/login", json=login_data)
+        response = client.post("/user/login", json=login_data)
         
         assert response.status_code == 500
         assert "Internal server error" in response.json()["detail"]
@@ -244,7 +244,7 @@ class TestUserAPIAddSession:
         token = create_access_token(data={"sub": "test_user_12345"})
         
         response = client.post(
-            "/add-session",
+            "/user/add-session",
             json=session_data,
             headers={"Authorization": f"Bearer {token}"}
         )
@@ -265,7 +265,7 @@ class TestUserAPIAddSession:
         token = create_access_token(data={"sub": "test_user_12345"})
         
         response = client.post(
-            "/add-session",
+            "/user/add-session",
             json=session_data,
             headers={"Authorization": f"Bearer {token}"}
         )
@@ -283,7 +283,7 @@ class TestUserAPIAddSession:
         
         with patch('User.user_api.user_db', None):
             response = client.post(
-                "/add-session",
+                "/user/add-session",
                 json=session_data,
                 headers={"Authorization": f"Bearer {token}"}
             )
@@ -305,7 +305,7 @@ class TestUserAPIAddSession:
         with patch('User.user_api.user_db', mock_user_service):
             client = TestClient(app)
             response = client.post(
-                "/add-session",
+                "/user/add-session",
                 json={"session_id": "test_session_12345"}
             )
         
@@ -323,7 +323,7 @@ class TestUserAPIAddSession:
         token = create_access_token(data={"sub": "test_user_12345"})
         
         response = client.post(
-            "/add-session",
+            "/user/add-session",
             json=session_data,
             headers={"Authorization": f"Bearer {token}"}
         )
@@ -336,18 +336,18 @@ class TestUserAPIGetSessions:
     
     def test_get_sessions_success(self, client, mock_user_service):
         """Test successful session retrieval."""
-        mock_sessions = {
-            "session_1": datetime.now(),
-            "session_2": datetime.now(),
-            "session_3": datetime.now()
-        }
+        mock_sessions = [
+            {"session_id": "session_1", "created_at": datetime.now()},
+            {"session_id": "session_2", "created_at": datetime.now()},
+            {"session_id": "session_3", "created_at": datetime.now()}
+        ]
         
         mock_user_service.get_sessions = AsyncMock(return_value=mock_sessions)
         
         token = create_access_token(data={"sub": "test_user_12345"})
         
         response = client.get(
-            "/get-sessions",
+            "/user/get-sessions",
             headers={"Authorization": f"Bearer {token}"}
         )
         
@@ -358,12 +358,12 @@ class TestUserAPIGetSessions:
     
     def test_get_sessions_empty(self, client, mock_user_service):
         """Test get sessions when user has no sessions."""
-        mock_user_service.get_sessions = AsyncMock(return_value={})
+        mock_user_service.get_sessions = AsyncMock(return_value=[])
         
         token = create_access_token(data={"sub": "test_user_12345"})
         
         response = client.get(
-            "/get-sessions",
+            "/user/get-sessions",
             headers={"Authorization": f"Bearer {token}"}
         )
         
@@ -377,7 +377,7 @@ class TestUserAPIGetSessions:
         
         with patch('User.user_api.user_db', None):
             response = client.get(
-                "/get-sessions",
+                "/user/get-sessions",
                 headers={"Authorization": f"Bearer {token}"}
             )
         
@@ -396,7 +396,7 @@ class TestUserAPIGetSessions:
         
         with patch('User.user_api.user_db', mock_user_service):
             client = TestClient(app)
-            response = client.get("/get-sessions")
+            response = client.get("/user/get-sessions")
         
         app.dependency_overrides.clear()
         assert response.status_code == 401
@@ -408,7 +408,7 @@ class TestUserAPIGetSessions:
         token = create_access_token(data={"sub": "test_user_12345"})
         
         response = client.get(
-            "/get-sessions",
+            "/user/get-sessions",
             headers={"Authorization": f"Bearer {token}"}
         )
         
@@ -430,7 +430,7 @@ class TestUserAPIDeleteSession:
         
         response = client.request(
             "DELETE",
-            "/delete-session",
+            "/user/delete-session",
             json=session_data,
             headers={"Authorization": f"Bearer {token}"}
         )
@@ -452,7 +452,7 @@ class TestUserAPIDeleteSession:
         
         response = client.request(
             "DELETE",
-            "/delete-session",
+            "/user/delete-session",
             json=session_data,
             headers={"Authorization": f"Bearer {token}"}
         )
@@ -471,7 +471,7 @@ class TestUserAPIDeleteSession:
         with patch('User.user_api.user_db', None):
             response = client.request(
                 "DELETE",
-                "/delete-session",
+                "/user/delete-session",
                 json=session_data,
                 headers={"Authorization": f"Bearer {token}"}
             )
@@ -493,7 +493,7 @@ class TestUserAPIDeleteSession:
             client = TestClient(app)
             response = client.request(
                 "DELETE",
-                "/delete-session",
+                "/user/delete-session",
                 json={"session_id": "test_session_12345"}
             )
         
@@ -512,7 +512,7 @@ class TestUserAPIDeleteSession:
         
         response = client.request(
             "DELETE",
-            "/delete-session",
+            "/user/delete-session",
             json=session_data,
             headers={"Authorization": f"Bearer {token}"}
         )
@@ -530,7 +530,7 @@ class TestUserAPIDeleteUser:
         token = create_access_token(data={"sub": "test_user_12345"})
         
         response = client.delete(
-            "/delete-user",
+            "/user/delete-user",
             headers={"Authorization": f"Bearer {token}"}
         )
         
@@ -546,7 +546,7 @@ class TestUserAPIDeleteUser:
         token = create_access_token(data={"sub": "test_user_12345"})
         
         response = client.delete(
-            "/delete-user",
+            "/user/delete-user",
             headers={"Authorization": f"Bearer {token}"}
         )
         
@@ -559,7 +559,7 @@ class TestUserAPIDeleteUser:
         
         with patch('User.user_api.user_db', None):
             response = client.delete(
-                "/delete-user",
+                "/user/delete-user",
                 headers={"Authorization": f"Bearer {token}"}
             )
         
@@ -578,7 +578,7 @@ class TestUserAPIDeleteUser:
         
         with patch('User.user_api.user_db', mock_user_service):
             client = TestClient(app)
-            response = client.delete("/delete-user")
+            response = client.delete("/user/delete-user")
         
         app.dependency_overrides.clear()
         assert response.status_code == 401
@@ -590,7 +590,7 @@ class TestUserAPIDeleteUser:
         token = create_access_token(data={"sub": "test_user_12345"})
         
         response = client.delete(
-            "/delete-user",
+            "/user/delete-user",
             headers={"Authorization": f"Bearer {token}"}
         )
         
@@ -648,8 +648,8 @@ class TestUserAPIRoot:
         assert response.json()["status"] == "running"
         assert response.json()["version"] == "1.0.0"
         assert "endpoints" in response.json()
-        assert "POST /register" in response.json()["endpoints"]
-        assert "POST /login" in response.json()["endpoints"]
+        assert "POST /user/register" in response.json()["endpoints"]
+        assert "POST /user/login" in response.json()["endpoints"]
 
 
 class TestUserAPIAuthentication:
@@ -671,10 +671,10 @@ class TestUserAPIAuthentication:
             
             # Test all protected endpoints require auth
             endpoints = [
-                ("POST", "/add-session", {"session_id": "test_session"}),
-                ("GET", "/get-sessions", None),
-                ("DELETE", "/delete-session", {"session_id": "test_session"}),
-                ("DELETE", "/delete-user", None),
+                ("POST", "/user/add-session", {"session_id": "test_session"}),
+                ("GET", "/user/get-sessions", None),
+                ("DELETE", "/user/delete-session", {"session_id": "test_session"}),
+                ("DELETE", "/user/delete-user", None),
             ]
             
             for method, endpoint, data in endpoints:
@@ -700,14 +700,14 @@ class TestUserAPIAuthentication:
         
         # Test register endpoint
         response = client.post(
-            "/register",
+            "/user/register",
             json={"email": "test@example.com", "username": "testuser", "password": "password123"}
         )
         assert response.status_code in [201, 422]  # 422 if validation fails, 201 if succeeds
         
         # Test login endpoint
         response = client.post(
-            "/login",
+            "/user/login",
             json={"user": "test@example.com", "password": "password123"}
         )
         assert response.status_code in [200, 401]  # 401 if invalid, 200 if succeeds
@@ -737,7 +737,7 @@ class TestUserAPIAuthentication:
             # TestClient should convert HTTPException to a 401 response
             try:
                 response = client.get(
-                    "/get-sessions",
+                    "/user/get-sessions",
                     headers={"Authorization": "Bearer invalid_token"}
                 )
                 # If no exception is raised, check the status code
@@ -756,7 +756,7 @@ class TestUserAPIAuthentication:
             client = TestClient(app)
             
             # Try to access protected endpoint without token
-            response = client.get("/get-sessions")
+            response = client.get("/user/get-sessions")
             
             # With contextVar-based auth, missing token results in 401 (not 403)
             assert response.status_code == 401

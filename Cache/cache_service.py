@@ -133,21 +133,27 @@ class RedisService:
             logger.error(f"Unexpected error getting message count for session {session_id}: {e}")
             raise e
     
-    def trim_cache(self, session_id: str, keep_last: int = None) -> bool:
+    def trim_cache(self, session_id: str, keep_last: Optional[int] = None) -> bool:
         """Trim the cache for a session to keep only the last `keep_last` messages."""
         if not self._initialized:
             raise RuntimeError("RedisService is not initialized.")
 
         try:
+            if keep_last is None:
+                return False
+            
             messages_key = self._get_messages_key(session_id)
-            if keep_last is not None:
-                # Remove all messages except the last `keep_last` ones
-                current_count = self.client.llen(messages_key)
-                if current_count > keep_last:
-                    self.client.ltrim(messages_key, -keep_last, -1)
-                    logger.info(f"Trimmed cache for session {session_id} to keep last {keep_last} messages.")
-                    return True
-            return False
+            
+            # Check current count
+            current_count = self.client.llen(messages_key)
+            
+            # Only trim if we have more messages than keep_last
+            if current_count <= keep_last:
+                return False
+            
+            self.client.ltrim(messages_key, -keep_last, -1)
+            logger.info(f"Trimmed cache for session {session_id} to keep last {keep_last} messages.")
+            return True
                 
         except redis.exceptions.RedisError as e:
             logger.error(f"Redis error trimming cache for session {session_id}: {e}")
@@ -185,6 +191,8 @@ class RedisService:
             summary = self.client.get(summary_key)
 
             logger.info(f"Retrieved summary for session {session_id}.")
+            if summary is None:
+                return None
             return summary
         
         except redis.exceptions.RedisError as e:
@@ -213,6 +221,26 @@ class RedisService:
             raise e
         except Exception as e:
             logger.error(f"Unexpected error clearing cache for session {session_id}: {e}")
+            raise e
+    
+    def check_session_existence(self, session_id: str) -> bool:
+        """Check if any cached data exists for a session in Redis."""
+        if not self._initialized:
+            raise RuntimeError("RedisService is not initialized.")
+
+        try:
+            # Verifying only the summary key as existence of summary implies existence of messages too.
+            summary_key = self._get_summary_key(session_id)
+            exists = self.client.exists(summary_key)
+
+            logger.info(f"Cache existence check for session {session_id}: {exists}")
+            return exists > 0
+        
+        except redis.exceptions.RedisError as e:
+            logger.error(f"Redis error checking cache existence for session {session_id}: {e}")
+            raise e
+        except Exception as e:
+            logger.error(f"Unexpected error checking cache existence for session {session_id}: {e}")
             raise e
 
     def health_check(self) -> bool:

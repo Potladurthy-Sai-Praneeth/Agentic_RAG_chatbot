@@ -6,6 +6,7 @@ from datetime import datetime
 class AddMessageResponseModel(BaseModel):
     message: str
     needs_summarization: bool
+    success: bool
 
 class AddMessageRequestModel(BaseModel):
     role: str
@@ -22,7 +23,7 @@ class GetMessageCountResponseModel(BaseModel):
 
 class TrimCacheResponseModel(BaseModel):
     message: str
-    needs_summarization: bool
+    success: bool
 
 class UpdateCacheSummaryResponseModel(BaseModel):
     message: str
@@ -43,3 +44,7 @@ class ClearCacheResponseModel(BaseModel):
 class CacheHealthResponseModel(BaseModel):
     status: str
     details: Optional[Dict[str, str]] = None
+
+class SessionExistsResponseModel(BaseModel):
+    exists: bool
+    success: bool

@@ -29,7 +29,7 @@ The token is obtained from the `/login` endpoint. The token payload contains:
 
 ### 1. Register User
 
-**Endpoint**: `POST /register`
+**Endpoint**: `POST /user/register`
 
 **Description**: Register a new user account with email, username, and password.
 
@@ -79,7 +79,7 @@ The token is obtained from the `/login` endpoint. The token payload contains:
 
 ### 2. Login
 
-**Endpoint**: `POST /login`
+**Endpoint**: `POST /user/login`
 
 **Description**: Authenticate a user and receive JWT access and refresh tokens.
 
@@ -129,7 +129,7 @@ The token is obtained from the `/login` endpoint. The token payload contains:
 
 ### 3. Add Session
 
-**Endpoint**: `POST /add-session`
+**Endpoint**: `POST /user/add-session`
 
 **Description**: Add a new session to the authenticated user's profile.
 
@@ -174,7 +174,7 @@ The token is obtained from the `/login` endpoint. The token payload contains:
 
 ### 4. Get Sessions
 
-**Endpoint**: `GET /get-sessions`
+**Endpoint**: `GET /user/get-sessions`
 
 **Description**: Retrieve all sessions associated with the authenticated user.
 
@@ -216,7 +216,7 @@ The token is obtained from the `/login` endpoint. The token payload contains:
 
 ### 5. Delete Session
 
-**Endpoint**: `DELETE /delete-session`
+**Endpoint**: `DELETE /user/delete-session`
 
 **Description**: Delete a specific session from the authenticated user's profile.
 
@@ -260,7 +260,7 @@ The token is obtained from the `/login` endpoint. The token payload contains:
 
 ### 6. Delete User
 
-**Endpoint**: `DELETE /delete-user`
+**Endpoint**: `DELETE /user/delete-user`
 
 **Description**: Delete the authenticated user's account and all associated sessions.
 
@@ -396,7 +396,7 @@ The token is obtained from the `/login` endpoint. The token payload contains:
 ### For Other Services
 
 1. **Authentication Flow**:
-   - Call `/login` endpoint with user credentials
+   - Call `/user/login` endpoint with user credentials
    - Receive `access_token` and `refresh_token`
    - Use `access_token` in Authorization header for protected endpoints
    - Use `refresh_token` to obtain new access tokens when expired
@@ -433,7 +433,7 @@ The token is obtained from the `/login` endpoint. The token payload contains:
 ### Register a User
 
 ```bash
-curl -X POST "http://localhost:8001/register" \
+curl -X POST "http://localhost:8001/user/register" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
@@ -445,7 +445,7 @@ curl -X POST "http://localhost:8001/register" \
 ### Login
 
 ```bash
-curl -X POST "http://localhost:8001/login" \
+curl -X POST "http://localhost:8001/user/login" \
   -H "Content-Type: application/json" \
   -d '{
     "user": "user@example.com",
@@ -456,7 +456,7 @@ curl -X POST "http://localhost:8001/login" \
 ### Add Session
 
 ```bash
-curl -X POST "http://localhost:8001/add-session" \
+curl -X POST "http://localhost:8001/user/add-session" \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -467,14 +467,14 @@ curl -X POST "http://localhost:8001/add-session" \
 ### Get Sessions
 
 ```bash
-curl -X GET "http://localhost:8001/get-sessions" \
+curl -X GET "http://localhost:8001/user/get-sessions" \
   -H "Authorization: Bearer <access_token>"
 ```
 
 ### Delete Session
 
 ```bash
-curl -X DELETE "http://localhost:8001/delete-session" \
+curl -X DELETE "http://localhost:8001/user/delete-session" \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -485,7 +485,7 @@ curl -X DELETE "http://localhost:8001/delete-session" \
 ### Delete User
 
 ```bash
-curl -X DELETE "http://localhost:8001/delete-user" \
+curl -X DELETE "http://localhost:8001/user/delete-user" \
   -H "Authorization: Bearer <access_token>"
 ```
 

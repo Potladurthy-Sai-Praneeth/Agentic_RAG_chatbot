@@ -2,7 +2,7 @@ from typing import Dict, Any
 import httpx
 import asyncio
 import logging 
-from RAG.context import current_jwt_token
+from RAG.context import current_jwt_token, current_jwt_token_string
 
 # Configure logging
 logging.basicConfig(
@@ -54,12 +54,16 @@ class ServiceClient:
 
         if requires_auth:
             # For internal service-to-service calls, we need to forward the token
-            # The token should be passed via headers in kwargs if available
-            # Otherwise, we'll rely on the service's own auth middleware
+            # Get the token string from context if not already provided in headers
             if "Authorization" not in headers:
-                # Try to get token from context (though it stores decoded payload)
-                # In practice, the calling service should pass the Authorization header
-                pass
+                token_string = current_jwt_token_string.get()
+                if token_string:
+                    headers["Authorization"] = f"Bearer {token_string}"
+                else:
+                    logger.warning(
+                        f"[{self.service_name}] No Authorization header provided and no token in context. "
+                        f"Request to {endpoint} may fail authentication."
+                    )
 
         kwargs.setdefault("headers", headers)
 

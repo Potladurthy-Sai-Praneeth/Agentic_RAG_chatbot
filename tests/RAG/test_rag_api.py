@@ -14,7 +14,7 @@ from RAG.jwt_utils import get_current_user, verify_token
 
 
 class TestRAGAPIGetSessionMessages:
-    """Tests for GET /rag/get-session-messages endpoint."""
+    """Tests for GET /rag/{session_id}/get-session-messages endpoint."""
     
     def test_get_session_messages_success(self, client, mock_rag_service, sample_chat_messages):
         """Test successful retrieval of session messages."""
@@ -23,8 +23,7 @@ class TestRAGAPIGetSessionMessages:
         token = "test_token"
         
         response = client.get(
-            "/rag/get-session-messages",
-            params={"session_id": "test_session_12345"},
+            "/rag/test_session_12345/get-session-messages",
             headers={"Authorization": f"Bearer {token}"}
         )
         
@@ -40,8 +39,7 @@ class TestRAGAPIGetSessionMessages:
         token = "test_token"
         
         response = client.get(
-            "/rag/get-session-messages",
-            params={"session_id": "test_session_12345"},
+            "/rag/test_session_12345/get-session-messages",
             headers={"Authorization": f"Bearer {token}"}
         )
         
@@ -54,7 +52,7 @@ class TestRAGAPIGetSessionMessages:
         
         with patch('RAG.rag_api.rag', None):
             response = client.get(
-                "/rag/get-session-messages?session_id=test_session_12345",
+                "/rag/test_session_12345/get-session-messages",
                 headers={"Authorization": f"Bearer {token}"}
             )
         
@@ -73,7 +71,7 @@ class TestRAGAPIGetSessionMessages:
         
         with patch('RAG.rag_api.rag', mock_rag_service):
             client = TestClient(app)
-            response = client.get("/rag/get-session-messages", params={"session_id": "test_session_12345"})
+            response = client.get("/rag/test_session_12345/get-session-messages")
         
         app.dependency_overrides.clear()
         assert response.status_code == 401
@@ -85,8 +83,7 @@ class TestRAGAPIGetSessionMessages:
         token = "test_token"
         
         response = client.get(
-            "/rag/get-session-messages",
-            params={"session_id": "test_session_12345"},
+            "/rag/test_session_12345/get-session-messages",
             headers={"Authorization": f"Bearer {token}"}
         )
         
@@ -510,7 +507,7 @@ class TestRAGAPIAuthentication:
             
             # Test all protected endpoints require auth
             endpoints = [
-                ("GET", "/rag/get-session-messages?session_id=test", None),
+                ("GET", "/rag/test/get-session-messages", None),
                 ("POST", "/rag/test_session/chat", {"message_id": "test", "role": "user", "content": "Hello"}),
                 ("GET", "/rag/get-sessions", None),
                 ("POST", "/rag/create-session", None),

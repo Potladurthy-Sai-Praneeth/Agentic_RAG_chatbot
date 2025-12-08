@@ -36,26 +36,41 @@ class RAGService:
         self.config = load_config()
         self._initialized = False
 
+        # Validate required environment variables
+        cache_url = os.getenv("CACHE_SERVICE_URL")
+        chat_url = os.getenv("CHAT_SERVICE_URL")
+        vectorstore_url = os.getenv("VECTORSTORE_SERVICE_URL")
+        user_url = os.getenv("USER_SERVICE_URL")
+        
+        if not cache_url:
+            raise ValueError("CACHE_SERVICE_URL environment variable is required")
+        if not chat_url:
+            raise ValueError("CHAT_SERVICE_URL environment variable is required")
+        if not vectorstore_url:
+            raise ValueError("VECTORSTORE_SERVICE_URL environment variable is required")
+        if not user_url:
+            raise ValueError("USER_SERVICE_URL environment variable is required")
+
         self.cache_api = ServiceClient(
-            base_url=os.getenv("CACHE_SERVICE_URL"),
+            base_url=cache_url,
             service_name="CacheService",
             config=self.config
         )
 
         self.chat_api = ServiceClient(
-            base_url=os.getenv("CHAT_SERVICE_URL"),
+            base_url=chat_url,
             service_name="ChatService",
             config=self.config
         )
 
         self.vectorstore_api = ServiceClient(
-            base_url=os.getenv("VECTORSTORE_SERVICE_URL"),
+            base_url=vectorstore_url,
             service_name="VectorStoreService",
             config=self.config
         ) 
 
         self.user_api = ServiceClient(
-            base_url=os.getenv("USER_SERVICE_URL"),
+            base_url=user_url,
             service_name="UserService",
             config=self.config
         )
@@ -206,7 +221,7 @@ class RAGService:
                     conversation_text = await self._format_conversation(all_messages, text=True)
                     logger.info(f"Formatted conversation for session {session_id}.")
 
-                    summary_prompt = self.config['prompts'].get('summary_template', '')
+                    summary_prompt = self.config['prompts'].get('summarization_template', '')
                     logger.info(f"Summary prompt template loaded for session {session_id}.")    
 
                     if current_summary.get("success") and len(all_messages) > 0:
@@ -227,7 +242,9 @@ class RAGService:
 
                         update_summary_response = await self.cache_api.post(f"/cache/{session_id}/update-summary", json=update_summary_payload)
 
-                        trim_cache_response = await self.cache_api.post(f"/cache/{session_id}/trim")
+                        # Trim cache to keep only last 2 messages after summarization
+                        # This keeps recent context while removing older messages that are now summarized
+                        trim_cache_response = await self.cache_api.delete(f"/cache/{session_id}/trim?keep_last=2")
 
                         if not update_summary_response.get("success"):
                             logger.error(f"Failed to update cache summary for session {session_id}.")

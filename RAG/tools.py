@@ -37,8 +37,8 @@ async def retrieve_personal_info(query: str) -> str:
         # pinecone_service_url = os.getenv("PINECONE_SERVICE_URL")
 
         service_client = ServiceClient(
-            base_url=os.getenv("PINECONE_SERVICE_URL"),
-            service_name="PineconeService",
+            base_url=os.getenv("VECTORSTORE_SERVICE_URL"),
+            service_name="VectorStoreService",
             config=CONFIG
         )
 

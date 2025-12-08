@@ -10,7 +10,7 @@ from datetime import datetime
 
 import uvicorn
 from RAG.jwt_utils import get_current_user, verify_token
-from RAG.context import current_jwt_token
+from RAG.context import current_jwt_token, current_jwt_token_string
 from fastapi import Request, Response
 from RAG.rag_service import RAGService
 from RAG.rag_service_pydantic_models import *
@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
         # Shutdown
         logger.info("Shutting down RAG Service API...")
         if rag:
-            rag.close()
+            await rag.close()
         logger.info("RAG Service API shut down successfully")
 
 
@@ -71,6 +71,7 @@ app.add_middleware(
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     token_resetter = None
+    token_string_resetter = None
     auth_header = request.headers.get("Authorization")
     
     try:
@@ -78,8 +79,9 @@ async def auth_middleware(request: Request, call_next):
             token = auth_header.split(" ")[1].strip()
             user_data = verify_token(token)
             
-            # SET THE CONTEXTVAR
+            # SET THE CONTEXTVARS - both decoded payload and raw token string
             token_resetter = current_jwt_token.set(user_data)
+            token_string_resetter = current_jwt_token_string.set(token)
         
         response = await call_next(request)
         
@@ -92,19 +94,21 @@ async def auth_middleware(request: Request, call_next):
         response = Response("Unauthorized", status_code=401)
         
     finally:
-        # Always reset the contextvar after the request is done
+        # Always reset the contextvars after the request is done
         if token_resetter:
             current_jwt_token.reset(token_resetter)
+        if token_string_resetter:
+            current_jwt_token_string.reset(token_string_resetter)
             
     return response
 
 
-@app.get("/rag/get-session-messages",response_model=List[GetChatMessagesResponseModel],
+@app.get("/rag/{session_id}/get-session-messages",response_model=List[GetChatMessagesResponseModel],
           summary="Retrieve chat messages for a session",
           response_description="List of chat messages",
           tags=["Session Chat Messages"]
           )
-async def get_session_messages(session_id: str , current_user: Dict = Depends(get_current_user)):
+async def get_session_messages(session_id: str, current_user: Dict = Depends(get_current_user)):
     """Retrieve all chat messages for a given session."""
     if not rag:
         logger.error("RAG service not initialized")
@@ -358,7 +362,7 @@ async def root():
         "status": "running",
         "message": "Welcome to the RAG Service API!",
         "endpoints": {
-            "GET /rag/get-session-messages": "Retrieve chat messages for a session",
+            "GET /rag/{session_id}/get-session-messages": "Retrieve chat messages for a session",
             "POST /rag/{session_id}/chat": "Invoke the agent to respond to the user query",
             "GET /rag/get-sessions": "Retrieve all session IDs for the current user",
             "POST /rag/create-session": "Create a new session for the current user",

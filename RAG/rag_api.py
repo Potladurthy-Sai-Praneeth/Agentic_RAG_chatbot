@@ -70,6 +70,14 @@ app.add_middleware(
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
+    # Skip authentication for OPTIONS requests (CORS preflight)
+    if request.method == "OPTIONS":
+        return await call_next(request)
+    
+    # Skip authentication for root and health endpoints
+    if request.url.path in ["/", "/health"]:
+        return await call_next(request)
+    
     token_resetter = None
     token_string_resetter = None
     auth_header = request.headers.get("Authorization")
@@ -77,21 +85,51 @@ async def auth_middleware(request: Request, call_next):
     try:
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ")[1].strip()
-            user_data = verify_token(token)
-            
-            # SET THE CONTEXTVARS - both decoded payload and raw token string
-            token_resetter = current_jwt_token.set(user_data)
-            token_string_resetter = current_jwt_token_string.set(token)
+            try:
+                user_data = verify_token(token)
+                
+                # SET THE CONTEXTVARS - both decoded payload and raw token string
+                token_resetter = current_jwt_token.set(user_data)
+                token_string_resetter = current_jwt_token_string.set(token)
+            except HTTPException as http_exc:
+                logger.warning(f"Token verification failed: {http_exc.detail}")
+                # Return 401 response with CORS headers
+                response = JSONResponse(
+                    status_code=401,
+                    content={"detail": http_exc.detail}
+                )
+                # Add CORS headers manually
+                origin = request.headers.get("origin", "*")
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                return response
+        else:
+            # No valid Authorization header provided
+            logger.warning("Missing or invalid Authorization header")
+            response = JSONResponse(
+                status_code=401,
+                content={"detail": "Missing or invalid Authorization header"}
+            )
+            # Add CORS headers manually
+            origin = request.headers.get("origin", "*")
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
         
         response = await call_next(request)
         
-    except HTTPException as http_exc:
-        # Re-raise HTTPException to preserve error details
-        raise http_exc
     except Exception as e:
         # Return a 401 Unauthorized response for other exceptions
         logger.error(f"Authentication error: {str(e)}")
-        response = Response("Unauthorized", status_code=401)
+        response = JSONResponse(
+            status_code=401,
+            content={"detail": "Unauthorized"}
+        )
+        # Add CORS headers manually
+        origin = request.headers.get("origin", "*")
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
         
     finally:
         # Always reset the contextvars after the request is done
@@ -377,7 +415,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "rag_api:app",
         host="0.0.0.0",
-        port=3000,
+        port=8005,
         reload=True,
         log_level="info"
     )

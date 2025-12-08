@@ -91,10 +91,14 @@ class RAGService:
                 raise
 
     
-    def _get_summary_model(self):
+    def _get_model(self,summary=True):
         """Get the configured summarization LLM."""
-        provider = self.config['models']['summary']['provider']
-        model_name = self.config['models']['summary']['name']
+        if summary:
+            provider = self.config['models']['summary']['provider']
+            model_name = self.config['models']['summary']['name']
+        else:
+            provider = self.config['models']['chat']['provider']
+            model_name = self.config['models']['chat']['name']
 
         if provider == 'gemini':
             return ChatGoogleGenerativeAI(
@@ -113,9 +117,6 @@ class RAGService:
        
     
     def _get_agent(self):
-
-        model_name = self.config['models']['chat']['name']
-        provider = self.config['models']['chat']['provider']
         system_prompt = self.config['prompts'].get('system_template', '')
 
         dynamic_names = {
@@ -123,8 +124,10 @@ class RAGService:
             "person_name": self.config['user'].get('chatbot_name', 'Viva')
         }
 
+        model = self._get_model(summary=False)
+
         return create_agent(
-            model_name=model_name,
+            model=model,
             tools=get_tools(),
             system_prompt=system_prompt.format(**dynamic_names),
         )

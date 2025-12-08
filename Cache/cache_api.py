@@ -68,27 +68,112 @@ app.add_middleware(
 
 
 @app.middleware("http")
+async def proxy_user_requests(request: Request, call_next):
+    """Proxy /user/* requests to User Service (port 8001)"""
+    if request.url.path.startswith("/user/"):
+        user_service_url = "http://localhost:8001"
+        target_url = f"{user_service_url}{request.url.path}"
+        
+        # Forward query parameters if any
+        if request.url.query:
+            target_url += f"?{request.url.query}"
+        
+        try:
+            # Read request body
+            body = await request.body()
+            
+            # Forward headers (excluding host)
+            headers = dict(request.headers)
+            headers.pop("host", None)
+            headers.pop("content-length", None)
+            
+            # Make request to User Service
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.request(
+                    method=request.method,
+                    url=target_url,
+                    headers=headers,
+                    content=body,
+                    follow_redirects=True
+                )
+                
+                # Return response from User Service
+                return FastAPIResponse(
+                    content=response.content,
+                    status_code=response.status_code,
+                    headers=dict(response.headers)
+                )
+        except httpx.RequestError as e:
+            logger.error(f"Error proxying request to User Service: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"User Service unavailable: {str(e)}"
+            )
+    
+    # For non-/user/* requests, continue with normal processing
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def auth_middleware(request: Request, call_next):
+    # Skip authentication for OPTIONS requests (CORS preflight)
+    if request.method == "OPTIONS":
+        return await call_next(request)
+    
+    # Skip authentication for root and health endpoints
+    if request.url.path in ["/", "/health"]:
+        return await call_next(request)
+    
     token_resetter = None
     auth_header = request.headers.get("Authorization")
     
     try:
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ")[1].strip()
-            user_data = verify_token(token)
-            
-            # SET THE CONTEXTVAR
-            token_resetter = current_jwt_token.set(user_data)
+            try:
+                user_data = verify_token(token)
+                
+                # SET THE CONTEXTVAR
+                token_resetter = current_jwt_token.set(user_data)
+            except HTTPException as http_exc:
+                logger.warning(f"Token verification failed: {http_exc.detail}")
+                # Return 401 response with CORS headers
+                response = JSONResponse(
+                    status_code=401,
+                    content={"detail": http_exc.detail}
+                )
+                # Add CORS headers manually
+                origin = request.headers.get("origin", "*")
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                return response
+        else:
+            # No valid Authorization header provided
+            logger.warning("Missing or invalid Authorization header")
+            response = JSONResponse(
+                status_code=401,
+                content={"detail": "Missing or invalid Authorization header"}
+            )
+            # Add CORS headers manually
+            origin = request.headers.get("origin", "*")
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
         
         response = await call_next(request)
         
-    except HTTPException as http_exc:
-        # Re-raise HTTPException to preserve error details
-        raise http_exc
     except Exception as e:
         # Return a 401 Unauthorized response for other exceptions
         logger.error(f"Authentication error: {str(e)}")
-        response = Response("Unauthorized", status_code=401)
+        response = JSONResponse(
+            status_code=401,
+            content={"detail": "Unauthorized"}
+        )
+        # Add CORS headers manually
+        origin = request.headers.get("origin", "*")
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
         
     finally:
         # Always reset the contextvar after the request is done

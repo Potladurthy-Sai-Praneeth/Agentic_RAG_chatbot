@@ -82,7 +82,7 @@ class ChatService:
         try:
             keyspace = os.getenv("CASSANDRA_KEYSPACE_NAME")
             replication_factor = self.config['cassandra'].get('replication_factor', 1)
-
+            
             create_keyspace_cql = f"""
             CREATE KEYSPACE IF NOT EXISTS {keyspace}
             WITH REPLICATION = {{ 'class' : 'SimpleStrategy', 'replication_factor' : {replication_factor} }};
@@ -107,8 +107,7 @@ class ChatService:
                             role TEXT,
                             content TEXT,
                             PRIMARY KEY (session_id, message_id)
-                        ) WITH CLUSTERING ORDER BY (message_id DESC)
-            );
+                        ) WITH CLUSTERING ORDER BY (message_id DESC);
             """
             await self.loop.run_in_executor(
                 self.executor,

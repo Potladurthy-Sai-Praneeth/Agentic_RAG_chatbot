@@ -1,4 +1,4 @@
-# Learning Chatbot - Frontend
+# Viva Chatbot - Frontend
 
 A modern, ChatGPT-style UI built with React, TypeScript, Redux Toolkit, and Tailwind CSS.
 
@@ -151,58 +151,3 @@ The app integrates with two backend services:
    - `/rag/{session_id}/get-session-messages` - Get session messages
    - `/rag/{session_id}/delete-session` - Delete session
 
-## Available Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
-
-## Browser Support
-
-- Chrome (latest)
-- Firefox (latest)
-- Safari (latest)
-- Edge (latest)
-
-## Troubleshooting
-
-### CORS Issues
-
-If you encounter CORS errors, ensure your backend services have CORS enabled for `http://localhost:3000`.
-
-### API Connection Issues
-
-1. Verify backend services are running:
-   ```bash
-   curl http://localhost:8001/health
-   curl http://localhost:8005/health
-   ```
-
-2. Check `.env` file has correct URLs
-
-3. Check browser console for detailed error messages
-
-### Build Issues
-
-If you encounter build issues:
-
-```bash
-# Clear node_modules and reinstall
-rm -rf node_modules package-lock.json
-npm install
-
-# Clear Vite cache
-rm -rf node_modules/.vite
-```
-
-## Contributing
-
-1. Follow the existing code style
-2. Use TypeScript for type safety
-3. Write meaningful commit messages
-4. Test on multiple browsers
-
-## License
-
-This project is part of the Learning Chatbot application.

@@ -1,4 +1,4 @@
 .env
 __pycache__/
 *.ipynb
-langchain_env_requirements.txt
+.pytest_cache/

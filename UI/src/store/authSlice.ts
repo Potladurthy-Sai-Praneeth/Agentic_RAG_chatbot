@@ -182,7 +182,6 @@ const authSlice = createSlice({
 });
 
 export const { logout, clearError, setNotAuthenticated } = authSlice.actions;
-export { logoutAndClearCache };
 
 // Setup the unauthorized handler to dispatch logout
 // Also accepts an optional callback to clear other state (like chat)

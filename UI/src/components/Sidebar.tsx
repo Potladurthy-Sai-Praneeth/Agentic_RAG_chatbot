@@ -9,7 +9,7 @@ import {
   fetchSessionMessages,
   clearChatState,
 } from '@/store/chatSlice';
-import { logout } from '@/store/authSlice';
+import { logoutAndClearCache } from '@/store/authSlice';
 import { PlusCircle, MessageSquare, Trash2, LogOut, X } from 'lucide-react';
 import { formatRelativeTime } from '@/utils/formatDate';
 
@@ -64,9 +64,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Clear chat state first
     dispatch(clearChatState());
-    dispatch(logout());
+    // Logout and clear all cached sessions in Redis
+    await dispatch(logoutAndClearCache());
     onClose();
   };
 

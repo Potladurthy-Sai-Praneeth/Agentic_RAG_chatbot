@@ -122,6 +122,11 @@ class ApiService {
     return response.data;
   }
 
+  async clearAllCaches(): Promise<{ success: boolean; message: string; cleared_count: number; total_sessions: number }> {
+    const response = await this.ragApi.delete(`/rag/clear-all-caches`);
+    return response.data;
+  }
+
   async getSessionTitle(sessionId: string): Promise<{ session_id: string; title: string }> {
     const response = await this.userApi.get(`/user/${sessionId}/get-session-title`);
     return response.data;

@@ -67,6 +67,23 @@ export const validateToken = createAsyncThunk(
   }
 );
 
+// Logout thunk that clears all caches before logging out
+export const logoutAndClearCache = createAsyncThunk(
+  'auth/logoutAndClearCache',
+  async (_, { dispatch, rejectWithValue }) => {
+    try {
+      // Clear all cached sessions in Redis to save space
+      await apiService.clearAllCaches();
+      return { success: true };
+    } catch (error: any) {
+      // Even if cache clearing fails, we still want to logout locally
+      // Just log the error but don't fail the logout
+      console.warn('Failed to clear caches on logout:', error);
+      return { success: false, error: error.message };
+    }
+  }
+);
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -134,11 +151,38 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.accessToken = null;
         state.refreshToken = null;
+      })
+      // Logout with cache clearing
+      .addCase(logoutAndClearCache.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(logoutAndClearCache.fulfilled, (state) => {
+        // Clear local state after cache clearing completes
+        state.user = null;
+        state.accessToken = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
+        state.loading = false;
+        state.error = null;
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+      })
+      .addCase(logoutAndClearCache.rejected, (state) => {
+        // Even if cache clearing fails, still logout locally
+        state.user = null;
+        state.accessToken = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
+        state.loading = false;
+        state.error = null;
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
       });
   },
 });
 
 export const { logout, clearError, setNotAuthenticated } = authSlice.actions;
+export { logoutAndClearCache };
 
 // Setup the unauthorized handler to dispatch logout
 // Also accepts an optional callback to clear other state (like chat)

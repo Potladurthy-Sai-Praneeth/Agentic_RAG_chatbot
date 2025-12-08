@@ -397,6 +397,42 @@ async def health_check():
             detail=f"Health check failed: {str(e)}"
             )
 
+@app.delete("/rag/clear-all-caches", response_model=dict,
+            summary="Clear all cached sessions for the current user",
+            response_description="Result of clearing all user caches",
+            tags=["Clear All Caches"]
+            )
+async def clear_all_user_caches(current_user: Dict = Depends(get_current_user)):
+    """Clear all cached data for all sessions of the current user (typically called on logout)."""
+    if not rag:
+        logger.error("RAG service not initialized")
+        raise HTTPException(
+            status_code = status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="RAG service not initialized"
+        )
+    try:
+        user_id = current_user.get("user_id")
+        if not user_id:
+            logger.error("User ID not found in token payload")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials"
+            )
+
+        clear_result = await rag.clear_all_user_caches(user_id)
+
+        logger.info(f"Cleared all caches for user {user_id}")
+        return clear_result
+    
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        logger.error(f"Error clearing all caches for user: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Failed to clear all caches: {str(e)}"
+            )
+
 @app.get('/', status_code=status.HTTP_200_OK,
         summary="Welcome Endpoint",
         description="Welcome endpoint for the Chat Service API."
@@ -413,6 +449,7 @@ async def root():
             "GET /rag/get-sessions": "Retrieve all session IDs for the current user",
             "POST /rag/create-session": "Create a new session for the current user",
             "DELETE /rag/{session_id}/delete-session": "Delete the session and all associated messages",
+            "DELETE /rag/clear-all-caches": "Clear all cached sessions for the current user (on logout)",
             "GET /health": "Health check endpoint for RAG service"
         }
     }

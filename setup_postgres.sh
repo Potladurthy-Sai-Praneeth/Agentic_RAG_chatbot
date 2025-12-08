@@ -13,6 +13,24 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+# Load environment variables from .env file if it exists
+ENV_FILE="$(dirname "$0")/.env"
+if [ -f "$ENV_FILE" ]; then
+    echo -e "${CYAN}Loading database credentials from .env file...${NC}"
+    # Export variables from .env file
+    export $(grep -v '^#' "$ENV_FILE" | xargs)
+fi
+
+# Set default values if not found in .env
+POSTGRES_DB="${POSTGRES_DB:-chatbot_users}"
+POSTGRES_USERNAME="${POSTGRES_USERNAME:-postgres}"
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
+
+echo -e "${GREEN}Using Database Configuration:${NC}"
+echo -e "  Database: ${POSTGRES_DB}"
+echo -e "  Username: ${POSTGRES_USERNAME}"
+echo ""
+
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║          PostgreSQL Setup for User Service                ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
@@ -28,15 +46,16 @@ echo "  sudo systemctl start postgresql"
 echo "  sudo systemctl enable postgresql"
 echo ""
 echo "  Then create the database:"
-echo "  sudo -u postgres psql -c \"CREATE DATABASE chatbot_users;\""
-echo "  sudo -u postgres psql -c \"ALTER USER postgres PASSWORD 'postgres';\""
+echo "  sudo -u postgres psql -c \"CREATE DATABASE ${POSTGRES_DB};\""
+echo "  sudo -u postgres psql -c \"ALTER USER ${POSTGRES_USERNAME} PASSWORD '${POSTGRES_PASSWORD}';\""
 echo ""
 
 echo -e "${GREEN}Option 2: Use Docker (if Docker is installed)${NC}"
 echo "  docker run -d \\"
 echo "    --name chatbot-postgres \\"
-echo "    -e POSTGRES_PASSWORD=postgres \\"
-echo "    -e POSTGRES_DB=chatbot_users \\"
+echo "    -e POSTGRES_USER=${POSTGRES_USERNAME} \\"
+echo "    -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \\"
+echo "    -e POSTGRES_DB=${POSTGRES_DB} \\"
 echo "    -p 5432:5432 \\"
 echo "    postgres:15"
 echo ""
@@ -45,12 +64,12 @@ echo -e "${GREEN}Option 3: Use PostgreSQL from Docker Compose${NC}"
 echo "  Create a docker-compose.yml file with PostgreSQL service"
 echo ""
 
-echo -e "${YELLOW}Note: Make sure your .env file has the correct PostgreSQL credentials:${NC}"
-echo "  POSTGRES_USERNAME=postgres"
-echo "  POSTGRES_PASSWORD=postgres"
-echo "  POSTGRES_DB=chatbot_users"
+echo -e "${YELLOW}Note: Your .env file currently has:${NC}"
+echo "  POSTGRES_USERNAME=${POSTGRES_USERNAME}"
+echo "  POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
+echo "  POSTGRES_DB=${POSTGRES_DB}"
 echo ""
-echo -e "${CYAN}The script will update your .env file automatically after setup.${NC}"
+echo -e "${CYAN}The script will preserve these settings in your .env file.${NC}"
 echo ""
 
 read -p "Do you want to install PostgreSQL locally now? (y/n): " -n 1 -r
@@ -65,8 +84,8 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     sudo systemctl enable postgresql
     
     echo -e "${BLUE}Creating database and user...${NC}"
-    sudo -u postgres psql -c "CREATE DATABASE chatbot_users;" 2>/dev/null || echo "Database already exists"
-    sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
+    sudo -u postgres psql -c "CREATE DATABASE ${POSTGRES_DB};" 2>/dev/null || echo "Database already exists"
+    sudo -u postgres psql -c "ALTER USER ${POSTGRES_USERNAME} PASSWORD '${POSTGRES_PASSWORD}';"
     
     # Allow local connections with password
     echo -e "${BLUE}Configuring PostgreSQL for password authentication...${NC}"
@@ -80,7 +99,6 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     fi
     
     # Update .env file
-    ENV_FILE="$(dirname "$0")/.env"
     if [ -f "$ENV_FILE" ]; then
         echo -e "${BLUE}Updating .env file...${NC}"
         # Backup existing .env
@@ -88,21 +106,21 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         
         # Update or add PostgreSQL variables
         if grep -q "^POSTGRES_DB=" "$ENV_FILE"; then
-            sed -i "s|^POSTGRES_DB=.*|POSTGRES_DB=chatbot_users|" "$ENV_FILE"
+            sed -i "s|^POSTGRES_DB=.*|POSTGRES_DB=${POSTGRES_DB}|" "$ENV_FILE"
         else
-            echo "POSTGRES_DB=chatbot_users" >> "$ENV_FILE"
+            echo "POSTGRES_DB=${POSTGRES_DB}" >> "$ENV_FILE"
         fi
         
         if grep -q "^POSTGRES_USERNAME=" "$ENV_FILE"; then
-            sed -i "s|^POSTGRES_USERNAME=.*|POSTGRES_USERNAME=postgres|" "$ENV_FILE"
+            sed -i "s|^POSTGRES_USERNAME=.*|POSTGRES_USERNAME=${POSTGRES_USERNAME}|" "$ENV_FILE"
         else
-            echo "POSTGRES_USERNAME=postgres" >> "$ENV_FILE"
+            echo "POSTGRES_USERNAME=${POSTGRES_USERNAME}" >> "$ENV_FILE"
         fi
         
         if grep -q "^POSTGRES_PASSWORD=" "$ENV_FILE"; then
-            sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=postgres|" "$ENV_FILE"
+            sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${POSTGRES_PASSWORD}|" "$ENV_FILE"
         else
-            echo "POSTGRES_PASSWORD=postgres" >> "$ENV_FILE"
+            echo "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}" >> "$ENV_FILE"
         fi
         
         echo -e "${GREEN}✓ .env file updated${NC}"
@@ -110,11 +128,11 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo -e "${YELLOW}⚠️  .env file not found. Creating one...${NC}"
         cat > "$ENV_FILE" <<EOF
 # PostgreSQL Configuration
-POSTGRES_DB=chatbot_users
-POSTGRES_USERNAME=postgres
-POSTGRES_PASSWORD=postgres
+POSTGRES_DB=${POSTGRES_DB}
+POSTGRES_USERNAME=${POSTGRES_USERNAME}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 EOF
-        echo -e "${GREEN}✓ Created .env file${NC}"
+        echo -e "${GREEN}✓ Created .env file with default values${NC}"
     fi
     
     echo -e "${GREEN}✓ PostgreSQL setup complete!${NC}"

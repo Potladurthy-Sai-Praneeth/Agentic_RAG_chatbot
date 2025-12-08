@@ -176,7 +176,8 @@ class RAGService:
             elif role == "assistant":
                 formatted.append(AIMessage(content=msg['content']))
 
-            formatted_text += f"{role}: {msg['content']}\n"
+            if text:
+                formatted_text += f"{role}: {msg['content']}\n"
         if text:
             return formatted_text
         return formatted
@@ -252,10 +253,7 @@ class RAGService:
                         }
 
                         update_summary_response = await self.cache_api.post(f"/cache/{session_id}/update-summary", json=update_summary_payload)
-
-                        # Trim cache to keep only last 2 messages after summarization
-                        # This keeps recent context while removing older messages that are now summarized
-                        trim_cache_response = await self.cache_api.delete(f"/cache/{session_id}/trim?keep_last=2")
+                        trim_cache_response = await self.cache_api.delete(f"/cache/{session_id}/trim")
 
                         if not update_summary_response.get("success"):
                             logger.error(f"Failed to update cache summary for session {session_id}.")
@@ -316,7 +314,6 @@ class RAGService:
                         except Exception as e:
                             logger.warning(f"Unexpected error while retrieving summary for session {session_id}: {e}")
                 except Exception as e:
-                    # Don't let summary restoration failures prevent message retrieval
                     logger.warning(f"Error during summary restoration for session {session_id}: {e}")
             
             logger.info(f"Retrieved {len(messages_response)} messages for session {session_id}.")
@@ -484,6 +481,48 @@ class RAGService:
 
         except Exception as e:
             logger.error(f"Error clearing cache for session {session_id}: {e}")
+            raise e
+    
+    async def clear_all_user_caches(self, user_id: str) -> Dict[str, Any]:
+        """Clear all cached data for all sessions of a user when they logout."""
+        if not self._initialized:
+            logger.error("RAGService not initialized. Call initialize() first.")
+            raise Exception("RAGService not initialized. Call initialize() first.")
+
+        try:
+            # Get all sessions for the user
+            sessions = await self.get_sessions(user_id)
+            
+            cleared_count = 0
+            failed_sessions = []
+            
+            # Clear cache for each session
+            for session in sessions:
+                session_id = session.get('session_id')
+                try:
+                    response = await self.cache_api.delete(f"/cache/{session_id}/clear")
+                    if response.get("success"):
+                        cleared_count += 1
+                        logger.info(f"Cleared cache for session {session_id}")
+                    else:
+                        failed_sessions.append(session_id)
+                        logger.warning(f"Failed to clear cache for session {session_id}")
+                except Exception as e:
+                    failed_sessions.append(session_id)
+                    logger.error(f"Error clearing cache for session {session_id}: {e}")
+            
+            logger.info(f"Cleared {cleared_count} out of {len(sessions)} session caches for user {user_id}")
+            
+            return {
+                "success": True,
+                "message": f"Cleared {cleared_count} out of {len(sessions)} session caches",
+                "cleared_count": cleared_count,
+                "total_sessions": len(sessions),
+                "failed_sessions": failed_sessions
+            }
+
+        except Exception as e:
+            logger.error(f"Error clearing all caches for user {user_id}: {e}")
             raise e
     
     async def delete_session(self, user_id: str, session_id: str) -> Dict[str, Any]:

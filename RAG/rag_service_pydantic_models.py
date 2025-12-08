@@ -18,7 +18,7 @@ class AssistantMessageResponseModel(BaseModel):
     response: str
 
 class UserMessageRequestModel(BaseModel):
-    message_id: str
+    message_id: Optional[str] = None  # Optional - backend generates TimeUUID if not provided
     role: str
     content: str
     timestamp: Optional[datetime] = None

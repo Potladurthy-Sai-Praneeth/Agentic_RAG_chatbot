@@ -77,7 +77,22 @@ class ServiceClient:
                     response = await client.request(method, url, **kwargs)
                     response.raise_for_status()
                     return response.json()
+            except httpx.HTTPStatusError as e:
+                # Don't retry client errors (4xx) - they won't succeed on retry
+                if 400 <= e.response.status_code < 500:
+                    logger.debug(
+                        f"[{self.service_name}] Request failed with status {e.response.status_code}: {str(e)}"
+                    )
+                    raise
+                # Retry server errors (5xx) and network errors
+                logger.warning(
+                    f"[{self.service_name}] Request failed (attempt {attempt + 1}/{max_retries}): {str(e)}"
+                )
+                if attempt == max_retries - 1:
+                    raise
+                await asyncio.sleep(retry_delay * (attempt + 1))
             except httpx.HTTPError as e:
+                # Network errors, timeouts, etc - retry these
                 logger.warning(
                     f"[{self.service_name}] Request failed (attempt {attempt + 1}/{max_retries}): {str(e)}"
                 )

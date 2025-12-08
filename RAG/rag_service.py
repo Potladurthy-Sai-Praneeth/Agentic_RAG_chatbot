@@ -1,5 +1,6 @@
 import asyncio
 import httpx
+from httpx import HTTPStatusError
 import json
 import logging
 import os
@@ -17,6 +18,13 @@ from RAG.client import ServiceClient
 from RAG.utils import load_config
 from RAG.tools import get_tools
 from RAG.context import current_jwt_token
+
+
+def serialize_datetime(value):
+    """Helper function to ensure datetime objects are converted to ISO format strings."""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value
 
 
 load_dotenv()
@@ -81,7 +89,7 @@ class RAGService:
         if not self._initialized:
             try:
                 self.agent = self._get_agent()
-                self.summary_model = self._get_summary_model()
+                self.summary_model = self._get_model()
                 # Verify services asynchronously
                 await self.verify_services()
                 self._initialized = True
@@ -120,8 +128,8 @@ class RAGService:
         system_prompt = self.config['prompts'].get('system_template', '')
 
         dynamic_names = {
-            "chatbot_name": self.config['user'].get('name'),
-            "person_name": self.config['user'].get('chatbot_name', 'Viva')
+            "person_name": self.config['user'].get('name'),
+            "chatbot_name": self.config['user'].get('chatbot_name', 'Viva')
         }
 
         model = self._get_model(summary=False)
@@ -184,7 +192,7 @@ class RAGService:
                 "message_id": message_id,
                 "role": role,
                 "content": content,
-                "timestamp": timestamp
+                "timestamp": serialize_datetime(timestamp)
             }
             chat_response = await self.chat_api.post(f"/chat/{session_id}/add-message", json=chat_payload)  
 
@@ -200,7 +208,7 @@ class RAGService:
             cache_payload = {
                  "role": role,
                 "content": content,
-                "timestamp": timestamp
+                "timestamp": serialize_datetime(timestamp)
             }
 
             cache_response = await self.cache_api.post(f"/cache/{session_id}/message", json=cache_payload)
@@ -240,7 +248,7 @@ class RAGService:
                         
                         update_summary_payload = {
                             "summary": new_summary,
-                            "timestamp": datetime.now()
+                            "timestamp": datetime.utcnow().isoformat()
                         }
 
                         update_summary_response = await self.cache_api.post(f"/cache/{session_id}/update-summary", json=update_summary_payload)
@@ -278,24 +286,38 @@ class RAGService:
         try:
             messages_response = await self.chat_api.get(f"/chat/{session_id}/get-messages")
 
-            session_exist = await self.cache_api.get(f"/cache/{session_id}/session-exists")
+            # Only try to restore summary if there are messages
+            if messages_response and len(messages_response) > 0:
+                try:
+                    session_exist = await self.cache_api.get(f"/cache/{session_id}/session-exists")
 
-            if not session_exist.get("exists"):
-                logger.warning(f"Session {session_id} does not exist in cache.")
-                
-                summary = await self.chat_api.get(f"/chat/{session_id}/get-summary")
+                    if not session_exist.get("exists"):
+                        logger.info(f"Session {session_id} does not exist in cache. Attempting to restore summary.")
+                        
+                        try:
+                            summary = await self.chat_api.get(f"/chat/{session_id}/get-summary")
 
-                if summary.get("summary"):
-                    payload = {
-                        "summary": summary.get("summary"),
-                        "timestamp": datetime.now()
-                    }
+                            if summary and summary.get("summary"):
+                                payload = {
+                                    "summary": summary.get("summary"),
+                                    "timestamp": datetime.utcnow().isoformat()
+                                }
 
-                    response = await self.cache_api.post(f"/cache/{session_id}/update-summary", json=payload)
-                    if response.get("success"):
-                        logger.info(f"Session {session_id} summary restored in cache.")
-                    else:
-                        logger.error(f"Failed to restore summary for session {session_id} in cache.")
+                                response = await self.cache_api.post(f"/cache/{session_id}/update-summary", json=payload)
+                                if response.get("success"):
+                                    logger.info(f"Session {session_id} summary restored in cache.")
+                                else:
+                                    logger.warning(f"Failed to restore summary for session {session_id} in cache.")
+                        except httpx.HTTPStatusError as e:
+                            if e.response.status_code == 404:
+                                logger.info(f"No summary exists for session {session_id} - this is normal for new sessions.")
+                            else:
+                                logger.warning(f"Error retrieving summary for session {session_id}: {e}")
+                        except Exception as e:
+                            logger.warning(f"Unexpected error while retrieving summary for session {session_id}: {e}")
+                except Exception as e:
+                    # Don't let summary restoration failures prevent message retrieval
+                    logger.warning(f"Error during summary restoration for session {session_id}: {e}")
             
             logger.info(f"Retrieved {len(messages_response)} messages for session {session_id}.")
             return messages_response
@@ -343,7 +365,14 @@ class RAGService:
 
             logger.info(f"Generated response for session {session_id}.")
 
-            return response['messages'][-1].content
+            # Extract content from the agent response
+            # The content can be a string or a list of content blocks
+            content = response['messages'][-1].content
+            if isinstance(content, list):
+                # Extract text from content blocks
+                text_parts = [block.get('text', '') if isinstance(block, dict) else str(block) for block in content]
+                return ' '.join(text_parts)
+            return content
         
         except Exception as e:
             logger.error(f"Error processing chat for session {session_id}: {e}")
@@ -372,12 +401,12 @@ class RAGService:
 
         try:
             session_id = str(uuid.uuid4())
-            created_at = datetime.now()
+            created_at = datetime.utcnow()
             logger.info(f"Creating new session {session_id} for user {user_id}.")
 
             payload = {
                 "session_id": session_id,
-                "created_at": created_at
+                "created_at": created_at.isoformat()
             }
 
             response = await self.user_api.post(f"/user/add-session", json=payload)

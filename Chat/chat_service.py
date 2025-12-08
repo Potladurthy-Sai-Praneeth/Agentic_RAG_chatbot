@@ -265,11 +265,13 @@ class ChatService:
                 {
                     "role": row.role,
                     "content": row.content,
-                    "message_id": row.message_id,
+                    "message_id": str(row.message_id),  # Convert UUID to string for Pydantic validation
                     "timestamp": row.timestamp
                 }
                 for row in rows
             ]
+            # Reverse to get oldest messages first (Cassandra returns DESC order)
+            messages.reverse()
             logger.info(f"Retrieved {len(messages)} messages for session_id={session_id}")
             return messages
 

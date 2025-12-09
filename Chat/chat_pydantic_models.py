@@ -24,11 +24,12 @@ class GetAllChatMessageResponseModel(BaseModel):
     timestamp: datetime
 
 class GetSessionSummaryResponseModel(BaseModel):
-    session_id: str
-    user_id: str
-    summary: str
-    last_updated: datetime
-    message_count: int
+    session_id: Optional[str] = None
+    user_id: Optional[str] = None
+    summary: Optional[str] = None
+    last_updated: Optional[datetime] = None
+    message_count: Optional[int] = None
+    success: bool = True
 
 class GetSessionSummaryRequestModel(BaseModel):
     session_id: str

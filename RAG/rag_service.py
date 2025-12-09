@@ -1,6 +1,4 @@
 import asyncio
-import httpx
-from httpx import HTTPStatusError
 import json
 import logging
 import os
@@ -195,7 +193,28 @@ class RAGService:
                 "content": content,
                 "timestamp": serialize_datetime(timestamp)
             }
-            chat_response = await self.chat_api.post(f"/chat/{session_id}/add-message", json=chat_payload)  
+            
+            cache_payload = {
+                "role": role,
+                "content": content,
+                "timestamp": serialize_datetime(timestamp)
+            }
+
+            # Parallelize chat and cache writes
+            chat_response, cache_response = await asyncio.gather(
+                self.chat_api.post(f"/chat/{session_id}/add-message", json=chat_payload),
+                self.cache_api.post(f"/cache/{session_id}/message", json=cache_payload),
+                return_exceptions=True
+            )
+
+            # Handle exceptions from parallel operations
+            if isinstance(chat_response, Exception):
+                logger.error(f"Failed to store message in database for user {user_id}: {chat_response}")
+                raise chat_response
+            
+            if isinstance(cache_response, Exception):
+                logger.error(f"Failed to cache message for session {session_id}: {cache_response}")
+                raise cache_response
 
             if not chat_response.get("success"):
                 logger.error(f"Failed to store message in database for user {user_id}.")
@@ -204,16 +223,6 @@ class RAGService:
                     "message": "Failed to store message in database."
                 }
 
-            logger.info(f"Stored message for user {user_id} with role {role} in database.")
-
-            cache_payload = {
-                 "role": role,
-                "content": content,
-                "timestamp": serialize_datetime(timestamp)
-            }
-
-            cache_response = await self.cache_api.post(f"/cache/{session_id}/message", json=cache_payload)
-
             if not cache_response.get("success"):
                 logger.error(f"Failed to cache message for session {session_id}.")
                 return {
@@ -221,55 +230,87 @@ class RAGService:
                     "message": "Failed to cache message."
                 }
 
-            if chat_response.get("success"):
-                if cache_response.get("needs_summarization") and cache_response.get('success'):
+            logger.info(f"Stored message for user {user_id} with role {role} in database and cache.")
 
-                    all_messages = await self.cache_api.get(f"/cache/{session_id}/messages")
-                    logger.info(f"Cache messages retrieved for session {session_id}.")
+            if chat_response.get("success") and cache_response.get("needs_summarization") and cache_response.get('success'):
+                # Parallelize cache reads for messages and summary
+                all_messages_result, current_summary_result = await asyncio.gather(
+                    self.cache_api.get(f"/cache/{session_id}/messages"),
+                    self.cache_api.get(f"/cache/{session_id}/get-summary"),
+                    return_exceptions=True
+                )
 
-                    current_summary = await self.cache_api.get(f"/cache/{session_id}/get-summary")
-                    logger.info(f"Current summary retrieved for session {session_id}.")
+                # Handle exceptions - services now return 200 with null instead of 404
+                if isinstance(all_messages_result, Exception):
+                    logger.error(f"Failed to retrieve cache messages for session {session_id}: {all_messages_result}")
+                    all_messages = []
+                else:
+                    all_messages = all_messages_result or []
 
-                    conversation_text = await self._format_conversation(all_messages, text=True)
-                    logger.info(f"Formatted conversation for session {session_id}.")
+                if isinstance(current_summary_result, Exception):
+                    logger.error(f"Failed to retrieve cache summary for session {session_id}: {current_summary_result}")
+                    current_summary = {}
+                else:
+                    # Service returns 200 with null summary if none exists (normal for < 10 messages)
+                    current_summary = current_summary_result or {}
 
-                    summary_prompt = self.config['prompts'].get('summarization_template', '')
-                    logger.info(f"Summary prompt template loaded for session {session_id}.")    
+                logger.info(f"Cache messages and summary retrieved for session {session_id}.")
 
-                    if current_summary.get("success") and len(all_messages) > 0:
-                        summary_input = summary_prompt.format(
-                            current_summary=current_summary.get("summary", "") or "",
-                            conversation=conversation_text
-                        )
+                conversation_text = await self._format_conversation(all_messages, text=True)
+                logger.info(f"Formatted conversation for session {session_id}.")
 
-                        summary_response = await self.summary_model.ainvoke(summary_input)
-                        logger.info(f"Generated new summary for session {session_id}.")
+                summary_prompt = self.config['prompts'].get('summarization_template', '')
+                logger.info(f"Summary prompt template loaded for session {session_id}.")    
 
-                        new_summary = summary_response.content if hasattr(summary_response, 'content') else str(summary_response)
-                        
-                        update_summary_payload = {
-                            "summary": new_summary,
-                            "timestamp": datetime.utcnow().isoformat()
-                        }
+                if current_summary.get("success") and len(all_messages) > 0:
+                    summary_input = summary_prompt.format(
+                        current_summary=current_summary.get("summary", "") or "",
+                        conversation=conversation_text
+                    )
 
-                        update_summary_response = await self.cache_api.post(f"/cache/{session_id}/update-summary", json=update_summary_payload)
-                        trim_cache_response = await self.cache_api.delete(f"/cache/{session_id}/trim")
+                    summary_response = await self.summary_model.ainvoke(summary_input)
+                    logger.info(f"Generated new summary for session {session_id}.")
 
-                        if not update_summary_response.get("success"):
-                            logger.error(f"Failed to update cache summary for session {session_id}.")
-                        else:
-                            logger.info(f"Cache summary updated for session {session_id}.")
+                    new_summary = summary_response.content if hasattr(summary_response, 'content') else str(summary_response)
+                    
+                    update_summary_payload = {
+                        "summary": new_summary,
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
 
-                        if not trim_cache_response.get("success"):
-                            logger.error(f"Failed to trim cache for session {session_id}.")
-                        else:
-                            logger.info(f"Cache trimmed for session {session_id}.")
+                    # Parallelize update summary and trim cache operations
+                    update_summary_response, trim_cache_response = await asyncio.gather(
+                        self.cache_api.post(f"/cache/{session_id}/update-summary", json=update_summary_payload),
+                        self.cache_api.delete(f"/cache/{session_id}/trim"),
+                        return_exceptions=True
+                    )
+
+                    # Handle exceptions
+                    if isinstance(update_summary_response, Exception):
+                        logger.error(f"Failed to update cache summary for session {session_id}: {update_summary_response}")
+                    elif not update_summary_response.get("success"):
+                        logger.error(f"Failed to update cache summary for session {session_id}.")
+                    else:
+                        logger.info(f"Cache summary updated for session {session_id}.")
+
+                    if isinstance(trim_cache_response, Exception):
+                        logger.error(f"Failed to trim cache for session {session_id}: {trim_cache_response}")
+                    elif not trim_cache_response.get("success"):
+                        logger.error(f"Failed to trim cache for session {session_id}.")
+                    else:
+                        logger.info(f"Cache trimmed for session {session_id}.")
                 
                 logger.info(f"Message cached successfully for session {session_id}.")
                 return {
                     "success": True,
                     "message": f"Message cached successfully for session {session_id}."
                 }
+
+            logger.info(f"Message cached successfully for session {session_id}.")
+            return {
+                "success": True,
+                "message": f"Message cached successfully for session {session_id}."
+            }
 
         except Exception as e:
             logger.error(f"Error storing message for user {user_id}: {e}")
@@ -295,7 +336,9 @@ class RAGService:
                         try:
                             summary = await self.chat_api.get(f"/chat/{session_id}/get-summary")
 
-                            if summary and summary.get("summary"):
+                            # Chat Service returns 200 with null values if no summary exists (normal for < 10 messages)
+                            # Check if summary exists and has content
+                            if summary and summary.get("summary") and summary.get("success"):
                                 payload = {
                                     "summary": summary.get("summary"),
                                     "timestamp": datetime.utcnow().isoformat()
@@ -306,13 +349,10 @@ class RAGService:
                                     logger.info(f"Session {session_id} summary restored in cache.")
                                 else:
                                     logger.warning(f"Failed to restore summary for session {session_id} in cache.")
-                        except httpx.HTTPStatusError as e:
-                            if e.response.status_code == 404:
-                                logger.info(f"No summary exists for session {session_id} - this is normal for new sessions.")
                             else:
-                                logger.warning(f"Error retrieving summary for session {session_id}: {e}")
+                                logger.info(f"No summary exists for session {session_id} - this is normal for sessions with fewer than 10 messages.")
                         except Exception as e:
-                            logger.warning(f"Unexpected error while retrieving summary for session {session_id}: {e}")
+                            logger.warning(f"Error retrieving summary for session {session_id}: {e}")
                 except Exception as e:
                     logger.warning(f"Error during summary restoration for session {session_id}: {e}")
             
@@ -330,19 +370,28 @@ class RAGService:
             raise Exception("RAGService not initialized. Call initialize() first.")
 
         try:
-            try:
-                history_data = await self.cache_api.get(f"/cache/{session_id}/messages")
-                logger.info(f"Retrieved chat history for session {session_id}.")
-            except Exception as e:
-                logger.error(f"Failed to retrieve chat history for session {session_id}: {e}")
-                history_data = []
+            # Parallelize cache reads for history and summary
+            history_result, summary_result = await asyncio.gather(
+                self.cache_api.get(f"/cache/{session_id}/messages"),
+                self.cache_api.get(f"/cache/{session_id}/get-summary"),
+                return_exceptions=True
+            )
 
-            try:
-                summary_data = await self.cache_api.get(f"/cache/{session_id}/get-summary")
-                logger.info(f"Retrieved chat summary for session {session_id}.")
-            except Exception as e:
-                logger.error(f"Failed to retrieve chat summary for session {session_id}: {e}")
+            # Handle exceptions - services now return 200 with null instead of 404
+            if isinstance(history_result, Exception):
+                logger.error(f"Failed to retrieve chat history for session {session_id}: {history_result}")
+                history_data = []
+            else:
+                history_data = history_result or []
+                logger.info(f"Retrieved chat history for session {session_id}.")
+
+            if isinstance(summary_result, Exception):
+                logger.error(f"Failed to retrieve chat summary for session {session_id}: {summary_result}")
                 summary_data = {}
+            else:
+                # Service returns 200 with null summary if none exists (normal for < 10 messages)
+                summary_data = summary_result or {}
+                logger.info(f"Retrieved chat summary for session {session_id}.")
 
             system_instruction = "You are a helpful RAG assistant."
             if summary_data.get("success") and summary_data.get("summary"):

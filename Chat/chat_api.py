@@ -253,11 +253,17 @@ async def get_session_summary(session_id: str, current_user: Dict = Depends(get_
 
         if summary:
             logger.info(f"Retrieved session summary for session {session_id}")
-            return GetSessionSummaryResponseModel(**summary)
+            return GetSessionSummaryResponseModel(**summary, success=True)
         else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Session summary not found"
+            # Return 200 with null values - "no summary yet" is a valid state, not an error
+            logger.info(f"No summary found for session {session_id} - this is normal for sessions with fewer than 10 messages")
+            return GetSessionSummaryResponseModel(
+                session_id=session_id,
+                user_id=user_id,
+                summary=None,
+                last_updated=None,
+                message_count=None,
+                success=True
             )
     except HTTPException as http_exc:
         raise http_exc

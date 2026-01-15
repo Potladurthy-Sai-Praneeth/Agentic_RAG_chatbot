@@ -168,7 +168,7 @@ Data Flow:
 #### 1. Clone the repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Potladurthy-Sai-Praneeth/Agentic_RAG_chatbot.git
 cd Learning_chatbot
 ```
 
